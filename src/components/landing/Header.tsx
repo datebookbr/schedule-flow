@@ -40,7 +40,7 @@ export function Header() {
             <span className={`text-xl font-bold transition-colors duration-300 ${
               isScrolled ? 'text-foreground' : 'text-primary-foreground'
             }`}>
-              AgendaPro
+              Datebook
             </span>
           </div>
 
