@@ -20,7 +20,7 @@ export function Footer() {
               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold">AgendaPro</span>
+              <span className="text-xl font-bold">Datebook</span>
             </div>
             <p className="text-primary-foreground/60 text-sm mb-6">
               Sistema completo de agendamentos integrado ao WhatsApp para 
@@ -117,7 +117,7 @@ export function Footer() {
         <div className="border-t border-primary-foreground/10 mt-12 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-primary-foreground/40 text-sm">
-              © {currentYear} AgendaPro. Todos os direitos reservados.
+              © {currentYear} Datebook. Todos os direitos reservados.
             </p>
             <p className="text-primary-foreground/40 text-sm">
               Desenvolvido com ❤️ no Brasil
