@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fetchPricing, type PricingPlan } from '@/lib/api';
 
 export function Pricing() {
   const [plans, setPlans] = useState<PricingPlan[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPricing().then(setPlans);
   }, []);
 
   const handleSelectPlan = (plan: PricingPlan) => {
-    // Navigate to payment page or handle plan selection
-    console.log('Selected plan:', plan);
-    // TODO: Implement payment navigation
-    // window.location.href = `/pagamento?plano=${plan.id}`;
+    navigate(`/cadastro?plano=${plan.id}`);
   };
 
   return (
