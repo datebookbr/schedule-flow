@@ -1,7 +1,14 @@
+import { useState, useEffect } from 'react';
 import { Calendar, Instagram, Facebook, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
+import { fetchSiteConfig, SiteConfig } from '@/lib/api';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>({ name: 'Datebook' });
+
+  useEffect(() => {
+    fetchSiteConfig().then(setSiteConfig);
+  }, []);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -17,10 +24,20 @@ export function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold">Datebook</span>
+              {siteConfig.logo ? (
+                <img 
+                  src={siteConfig.logo} 
+                  alt={siteConfig.name} 
+                  className="h-10 w-auto object-contain"
+                />
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <span className="text-xl font-bold">{siteConfig.name}</span>
+                </>
+              )}
             </div>
             <p className="text-primary-foreground/60 text-sm mb-6">
               Sistema completo de agendamentos integrado ao WhatsApp para 
@@ -99,7 +116,7 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-primary-foreground/60 text-sm">
                 <Mail className="w-4 h-4 flex-shrink-0" />
-                contato@agendapro.com.br
+                contato@datebook.com.br
               </li>
               <li className="flex items-center gap-3 text-primary-foreground/60 text-sm">
                 <Phone className="w-4 h-4 flex-shrink-0" />
@@ -117,7 +134,7 @@ export function Footer() {
         <div className="border-t border-primary-foreground/10 mt-12 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-primary-foreground/40 text-sm">
-              © {currentYear} Datebook. Todos os direitos reservados.
+              © {currentYear} {siteConfig.name}. Todos os direitos reservados.
             </p>
             <p className="text-primary-foreground/40 text-sm">
               Desenvolvido com ❤️ no Brasil

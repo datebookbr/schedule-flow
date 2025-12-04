@@ -3,6 +3,28 @@
 
 const API_BASE_URL = '/api';
 
+// Site Configuration
+export interface SiteConfig {
+  name: string;
+  logo?: string; // URL do logotipo (opcional)
+  tagline?: string;
+}
+
+// Mock Site Config
+export const mockSiteConfig: SiteConfig = {
+  name: 'Datebook',
+  logo: '', // Deixe vazio para usar o ícone padrão, ou insira a URL do logo
+  tagline: 'Sistema de Agendamentos'
+};
+
+// Fetch Site Config
+export async function fetchSiteConfig(): Promise<SiteConfig> {
+  // TODO: Replace with actual API call
+  // const response = await fetch(`${API_BASE_URL}/land_config.asp`);
+  // return response.json();
+  return Promise.resolve(mockSiteConfig);
+}
+
 // Mock data - Replace with actual API calls when endpoints are ready
 export interface Benefit {
   id: string;

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, Calendar } from 'lucide-react';
+import { fetchSiteConfig, SiteConfig } from '@/lib/api';
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>({ name: 'Datebook' });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -12,6 +14,10 @@ export function Header() {
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    fetchSiteConfig().then(setSiteConfig);
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -34,14 +40,24 @@ export function Header() {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-hero flex items-center justify-center shadow-glow">
-              <Calendar className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className={`text-xl font-bold transition-colors duration-300 ${
-              isScrolled ? 'text-foreground' : 'text-primary-foreground'
-            }`}>
-              Datebook
-            </span>
+            {siteConfig.logo ? (
+              <img 
+                src={siteConfig.logo} 
+                alt={siteConfig.name} 
+                className="h-10 w-auto object-contain"
+              />
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-xl bg-gradient-hero flex items-center justify-center shadow-glow">
+                  <Calendar className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <span className={`text-xl font-bold transition-colors duration-300 ${
+                  isScrolled ? 'text-foreground' : 'text-primary-foreground'
+                }`}>
+                  {siteConfig.name}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Desktop Navigation */}
