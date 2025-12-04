@@ -6,26 +6,14 @@ const API_BASE_URL = '/api';
 // Site Configuration
 export interface SiteConfig {
   name: string;
-  logo?: string; // URL do logotipo (opcional)
+  logo?: string;
   tagline?: string;
+  whatsapp?: string;
+  email?: string;
+  address?: string;
 }
 
-// Mock Site Config
-export const mockSiteConfig: SiteConfig = {
-  name: 'Datebook',
-  logo: '', // Deixe vazio para usar o ícone padrão, ou insira a URL do logo
-  tagline: 'Sistema de Agendamentos'
-};
-
-// Fetch Site Config
-export async function fetchSiteConfig(): Promise<SiteConfig> {
-  // TODO: Replace with actual API call
-  // const response = await fetch(`${API_BASE_URL}/land_config.asp`);
-  // return response.json();
-  return Promise.resolve(mockSiteConfig);
-}
-
-// Mock data - Replace with actual API calls when endpoints are ready
+// Benefit Interface
 export interface Benefit {
   id: string;
   icon: string;
@@ -33,12 +21,14 @@ export interface Benefit {
   description: string;
 }
 
+// Service Interface
 export interface Service {
   id: string;
   name: string;
   included: boolean;
 }
 
+// Pricing Plan Interface
 export interface PricingPlan {
   id: string;
   name: string;
@@ -52,14 +42,50 @@ export interface PricingPlan {
   cta: string;
 }
 
-export interface Professional {
-  id: string;
+// Customer Registration Interface
+export interface CustomerData {
   name: string;
-  role: string;
-  image: string;
+  email: string;
+  phone: string;
+  cpfCnpj: string;
+  company?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
 }
 
-// Mock Benefits Data
+// Payment Data Interface
+export interface PaymentData {
+  planId: string;
+  customerId?: string;
+  paymentMethod: 'credit_card' | 'pix';
+  cardNumber?: string;
+  cardName?: string;
+  cardExpiry?: string;
+  cardCvv?: string;
+}
+
+// Payment Response Interface
+export interface PaymentResponse {
+  success: boolean;
+  transactionId?: string;
+  pixCode?: string;
+  pixQrCode?: string;
+  message?: string;
+}
+
+// Mock Data - Replace with actual API calls when endpoints are ready
+
+export const mockSiteConfig: SiteConfig = {
+  name: 'Datebook',
+  logo: '',
+  tagline: 'Sistema de Agendamentos',
+  whatsapp: '5511999999999',
+  email: 'contato@datebook.com.br',
+  address: 'São Paulo, SP'
+};
+
 export const mockBenefits: Benefit[] = [
   {
     id: '1',
@@ -99,7 +125,6 @@ export const mockBenefits: Benefit[] = [
   }
 ];
 
-// Mock Services Data
 export const mockServices: Service[] = [
   { id: '1', name: 'Página exclusiva personalizada para seu estabelecimento', included: true },
   { id: '2', name: 'Integração completa com WhatsApp Business', included: true },
@@ -115,7 +140,6 @@ export const mockServices: Service[] = [
   { id: '12', name: 'Fotos e descrição dos profissionais', included: true },
 ];
 
-// Mock Pricing Data
 export const mockPricing: PricingPlan[] = [
   {
     id: '1',
@@ -174,6 +198,14 @@ export const mockPricing: PricingPlan[] = [
 ];
 
 // API Functions - Replace mock data with actual fetch calls
+
+export async function fetchSiteConfig(): Promise<SiteConfig> {
+  // TODO: Replace with actual API call
+  // const response = await fetch(`${API_BASE_URL}/land_config.asp`);
+  // return response.json();
+  return Promise.resolve(mockSiteConfig);
+}
+
 export async function fetchBenefits(): Promise<Benefit[]> {
   // TODO: Replace with actual API call
   // const response = await fetch(`${API_BASE_URL}/land_beneficios.asp`);
@@ -193,4 +225,56 @@ export async function fetchPricing(): Promise<PricingPlan[]> {
   // const response = await fetch(`${API_BASE_URL}/land_precos.asp`);
   // return response.json();
   return Promise.resolve(mockPricing);
+}
+
+export async function fetchPlanById(planId: string): Promise<PricingPlan | null> {
+  // TODO: Replace with actual API call
+  // const response = await fetch(`${API_BASE_URL}/land_plano.asp?id=${planId}`);
+  // return response.json();
+  const plan = mockPricing.find(p => p.id === planId);
+  return Promise.resolve(plan || null);
+}
+
+export async function registerCustomer(data: CustomerData): Promise<{ success: boolean; customerId?: string; message?: string }> {
+  // TODO: Replace with actual API call
+  // const response = await fetch(`${API_BASE_URL}/land_cadastro.asp`, {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify(data)
+  // });
+  // return response.json();
+  
+  // Mock response
+  return Promise.resolve({
+    success: true,
+    customerId: 'CUST_' + Date.now(),
+    message: 'Cadastro realizado com sucesso!'
+  });
+}
+
+export async function processPayment(data: PaymentData): Promise<PaymentResponse> {
+  // TODO: Replace with actual API call
+  // const response = await fetch(`${API_BASE_URL}/land_pagamento.asp`, {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify(data)
+  // });
+  // return response.json();
+  
+  // Mock response
+  if (data.paymentMethod === 'pix') {
+    return Promise.resolve({
+      success: true,
+      transactionId: 'TXN_' + Date.now(),
+      pixCode: '00020126580014br.gov.bcb.pix0136a629532e-7693-4846-835d-09e3ee8e2f1e5204000053039865802BR5925DATEBOOK SISTEMAS LTDA6009SAO PAULO62070503***6304E2CA',
+      pixQrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      message: 'PIX gerado com sucesso!'
+    });
+  }
+  
+  return Promise.resolve({
+    success: true,
+    transactionId: 'TXN_' + Date.now(),
+    message: 'Pagamento processado com sucesso!'
+  });
 }
