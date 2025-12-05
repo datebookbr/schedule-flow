@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, Calendar } from 'lucide-react';
-import { fetchSiteConfig, SiteConfig } from '@/lib/api';
+import { fetchSiteConfig, fetchPageTexts, SiteConfig, PageTexts } from '@/lib/api';
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>({ name: 'Datebook' });
+  const [texts, setTexts] = useState<PageTexts['header'] | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -18,6 +19,7 @@ export function Header() {
 
   useEffect(() => {
     fetchSiteConfig().then(setSiteConfig);
+    fetchPageTexts().then(data => setTexts(data.header));
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -27,6 +29,12 @@ export function Header() {
       setIsMobileMenuOpen(false);
     }
   };
+
+  const menuItems = texts ? [
+    { label: texts.menuBeneficios, id: 'beneficios' },
+    { label: texts.menuServicos, id: 'servicos' },
+    { label: texts.menuPrecos, id: 'precos' },
+  ] : [];
 
   return (
     <header
@@ -62,11 +70,7 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            {[
-              { label: 'Benefícios', id: 'beneficios' },
-              { label: 'Serviços', id: 'servicos' },
-              { label: 'Preços', id: 'precos' },
-            ].map((item) => (
+            {menuItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => scrollToSection(item.id)}
@@ -85,7 +89,7 @@ export function Header() {
               variant={isScrolled ? 'default' : 'heroOutline'}
               onClick={() => scrollToSection('precos')}
             >
-              Contrate Agora
+              {texts?.ctaButton || 'Contrate Agora'}
             </Button>
           </div>
 
@@ -106,11 +110,7 @@ export function Header() {
         {isMobileMenuOpen && (
           <div className="md:hidden bg-background/95 backdrop-blur-md rounded-xl shadow-lg p-4 mb-4 animate-fade-up">
             <nav className="flex flex-col gap-4">
-              {[
-                { label: 'Benefícios', id: 'beneficios' },
-                { label: 'Serviços', id: 'servicos' },
-                { label: 'Preços', id: 'precos' },
-              ].map((item) => (
+              {menuItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => scrollToSection(item.id)}
@@ -124,7 +124,7 @@ export function Header() {
                 className="w-full mt-2"
                 onClick={() => scrollToSection('precos')}
               >
-                Contrate Agora
+                {texts?.ctaButton || 'Contrate Agora'}
               </Button>
             </nav>
           </div>

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchServices, type Service } from '@/lib/api';
+import { fetchServices, fetchPageTexts, type Service, type PageTexts } from '@/lib/api';
 
 export function Services() {
   const [services, setServices] = useState<Service[]>([]);
+  const [texts, setTexts] = useState<PageTexts['services'] | null>(null);
 
   useEffect(() => {
     fetchServices().then(setServices);
+    fetchPageTexts().then(data => setTexts(data.services));
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -17,6 +19,8 @@ export function Services() {
     }
   };
 
+  if (!texts) return null;
+
   return (
     <section id="servicos" className="py-20 md:py-32 bg-background">
       <div className="container mx-auto px-4">
@@ -24,22 +28,21 @@ export function Services() {
           {/* Left Content */}
           <div>
             <span className="inline-block text-sm font-semibold text-primary uppercase tracking-wider mb-4">
-              Serviços Inclusos
+              {texts.sectionLabel}
             </span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
-              Tudo que você precisa para{' '}
-              <span className="text-gradient-primary">crescer seu negócio</span>
+              {texts.title}{' '}
+              <span className="text-gradient-primary">{texts.titleHighlight}</span>
             </h2>
             <p className="text-muted-foreground text-lg mb-8">
-              Nossa plataforma oferece todas as ferramentas necessárias para gerenciar 
-              seus agendamentos de forma profissional e eficiente.
+              {texts.subtitle}
             </p>
             <Button
               variant="hero"
               size="lg"
               onClick={() => scrollToSection('precos')}
             >
-              Contratar Agora
+              {texts.ctaButton}
               <ArrowRight className="w-5 h-5" />
             </Button>
           </div>

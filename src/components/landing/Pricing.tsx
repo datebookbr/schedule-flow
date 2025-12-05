@@ -2,19 +2,23 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchPricing, type PricingPlan } from '@/lib/api';
+import { fetchPricing, fetchPageTexts, type PricingPlan, type PageTexts } from '@/lib/api';
 
 export function Pricing() {
   const [plans, setPlans] = useState<PricingPlan[]>([]);
+  const [texts, setTexts] = useState<PageTexts['pricing'] | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchPricing().then(setPlans);
+    fetchPageTexts().then(data => setTexts(data.pricing));
   }, []);
 
   const handleSelectPlan = (plan: PricingPlan) => {
     navigate(`/cadastro?plano=${plan.id}`);
   };
+
+  if (!texts) return null;
 
   return (
     <section id="precos" className="py-20 md:py-32 bg-gradient-subtle">
@@ -22,13 +26,13 @@ export function Pricing() {
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-16">
           <span className="inline-block text-sm font-semibold text-primary uppercase tracking-wider mb-4">
-            Planos e Preços
+            {texts.sectionLabel}
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Escolha o plano ideal para você
+            {texts.title}
           </h2>
           <p className="text-muted-foreground">
-            Comece com nosso plano essencial e escale conforme seu negócio cresce
+            {texts.subtitle}
           </p>
         </div>
 
@@ -49,7 +53,7 @@ export function Pricing() {
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                   <div className="inline-flex items-center gap-1.5 bg-gradient-hero text-primary-foreground text-xs font-semibold px-4 py-1.5 rounded-full shadow-md">
                     <Sparkles className="w-3.5 h-3.5" />
-                    Mais Popular
+                    {texts.popularBadge}
                   </div>
                 </div>
               )}
@@ -104,7 +108,7 @@ export function Pricing() {
 
         {/* Additional Info */}
         <p className="text-center text-sm text-muted-foreground mt-12">
-          * Valores para pagamento mensal. Economize até 20% no plano anual.
+          {texts.footnote}
         </p>
       </div>
     </section>

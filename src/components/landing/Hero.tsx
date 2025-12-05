@@ -1,13 +1,23 @@
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Calendar, ArrowRight, MessageCircle, Users } from 'lucide-react';
+import { Calendar, ArrowRight, MessageCircle } from 'lucide-react';
+import { fetchPageTexts, PageTexts } from '@/lib/api';
 
 export function Hero() {
+  const [texts, setTexts] = useState<PageTexts['hero'] | null>(null);
+
+  useEffect(() => {
+    fetchPageTexts().then(data => setTexts(data.hero));
+  }, []);
+
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (!texts) return null;
 
   return (
     <section className="relative min-h-screen bg-gradient-hero overflow-hidden">
@@ -31,15 +41,15 @@ export function Hero() {
           <div className="inline-flex items-center gap-2 bg-primary-foreground/10 backdrop-blur-sm border border-primary-foreground/20 rounded-full px-4 py-2 mb-8 animate-fade-up">
             <span className="w-2 h-2 bg-accent rounded-full animate-pulse-soft" />
             <span className="text-sm font-medium text-primary-foreground/90">
-              Sistema completo de agendamentos
+              {texts.badge}
             </span>
           </div>
 
           {/* Main Heading */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-primary-foreground leading-tight mb-6 animate-fade-up-delay-1">
-            Transforme seu negócio com{' '}
+            {texts.titlePart1}{' '}
             <span className="relative">
-              agendamentos inteligentes
+              {texts.titleHighlight}
               <svg
                 className="absolute -bottom-2 left-0 w-full"
                 viewBox="0 0 300 12"
@@ -59,8 +69,7 @@ export function Hero() {
 
           {/* Subheading */}
           <p className="text-lg md:text-xl text-primary-foreground/80 mb-10 max-w-2xl mx-auto animate-fade-up-delay-2">
-            Sistema integrado ao WhatsApp para profissionais de saúde e beleza. 
-            Automatize confirmações, gerencie sua agenda e fidelize seus clientes.
+            {texts.subtitle}
           </p>
 
           {/* CTA Buttons */}
@@ -71,7 +80,7 @@ export function Hero() {
               onClick={() => scrollToSection('precos')}
               className="w-full sm:w-auto"
             >
-              Contrate Agora
+              {texts.ctaPrimary}
               <ArrowRight className="w-5 h-5" />
             </Button>
             <Button
@@ -80,17 +89,13 @@ export function Hero() {
               onClick={() => scrollToSection('servicos')}
               className="w-full sm:w-auto"
             >
-              Ver Serviços
+              {texts.ctaSecondary}
             </Button>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 md:gap-8 mt-16 md:mt-20 max-w-xl mx-auto">
-            {[
-              { value: '5.000+', label: 'Profissionais' },
-              { value: '100k+', label: 'Agendamentos' },
-              { value: '99%', label: 'Satisfação' },
-            ].map((stat, index) => (
+            {texts.stats.map((stat, index) => (
               <div
                 key={stat.label}
                 className="text-center animate-fade-up"

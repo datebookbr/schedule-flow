@@ -181,7 +181,91 @@ CREATE INDEX idx_clientes_email ON land_clientes(email);
 CREATE INDEX idx_clientes_status ON land_clientes(status);
 ```
 
-### 1.7 Tabela: `land_pagamentos`
+### 1.7 Tabela: `land_textos`
+Todos os textos exibidos na landing page (cada texto é um campo).
+
+```sql
+CREATE TABLE land_textos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    secao VARCHAR(50) NOT NULL,
+    chave VARCHAR(100) NOT NULL,
+    valor TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_secao_chave (secao, chave)
+);
+
+-- HEADER
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('header', 'menu_beneficios', 'Benefícios'),
+('header', 'menu_servicos', 'Serviços'),
+('header', 'menu_precos', 'Preços'),
+('header', 'cta_button', 'Contrate Agora');
+
+-- HERO
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('hero', 'badge', 'Sistema completo de agendamentos'),
+('hero', 'title_part1', 'Transforme seu negócio com'),
+('hero', 'title_highlight', 'agendamentos inteligentes'),
+('hero', 'subtitle', 'Sistema integrado ao WhatsApp para profissionais de saúde e beleza. Automatize confirmações, gerencie sua agenda e fidelize seus clientes.'),
+('hero', 'cta_primary', 'Contrate Agora'),
+('hero', 'cta_secondary', 'Ver Serviços'),
+('hero', 'stat_1_value', '5.000+'),
+('hero', 'stat_1_label', 'Profissionais'),
+('hero', 'stat_2_value', '100k+'),
+('hero', 'stat_2_label', 'Agendamentos'),
+('hero', 'stat_3_value', '99%'),
+('hero', 'stat_3_label', 'Satisfação');
+
+-- BENEFITS SECTION
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('benefits', 'section_label', 'Por que escolher'),
+('benefits', 'title', 'Tudo que você precisa em um só lugar'),
+('benefits', 'subtitle', 'Simplifique sua gestão com ferramentas poderosas integradas ao WhatsApp');
+
+-- SERVICES SECTION
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('services', 'section_label', 'Serviços Inclusos'),
+('services', 'title', 'Tudo que você precisa para'),
+('services', 'title_highlight', 'crescer seu negócio'),
+('services', 'subtitle', 'Nossa plataforma oferece todas as ferramentas necessárias para gerenciar seus agendamentos de forma profissional e eficiente.'),
+('services', 'cta_button', 'Contratar Agora');
+
+-- PRICING SECTION
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('pricing', 'section_label', 'Planos e Preços'),
+('pricing', 'title', 'Escolha o plano ideal para você'),
+('pricing', 'subtitle', 'Comece com nosso plano essencial e escale conforme seu negócio cresce'),
+('pricing', 'popular_badge', 'Mais Popular'),
+('pricing', 'footnote', '* Valores para pagamento mensal. Economize até 20% no plano anual.');
+
+-- CTA SECTION
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('cta', 'badge', 'Integração completa com WhatsApp'),
+('cta', 'title', 'Pronto para transformar seu negócio?'),
+('cta', 'subtitle', 'Junte-se a milhares de profissionais que já automatizaram seus agendamentos. Comece hoje com apenas R$ 49,90/mês.'),
+('cta', 'cta_primary', 'Começar Agora'),
+('cta', 'cta_secondary', 'Falar com Consultor'),
+('cta', 'whatsapp_number', '5511999999999');
+
+-- FOOTER
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('footer', 'description', 'Sistema completo de agendamentos integrado ao WhatsApp para profissionais de saúde e beleza.'),
+('footer', 'nav_title', 'Navegação'),
+('footer', 'legal_title', 'Legal'),
+('footer', 'legal_termos', 'Termos de Uso'),
+('footer', 'legal_privacidade', 'Política de Privacidade'),
+('footer', 'legal_cookies', 'Cookies'),
+('footer', 'contact_title', 'Contato'),
+('footer', 'copyright', 'Todos os direitos reservados.'),
+('footer', 'developed_by', 'Desenvolvido com ❤️ no Brasil');
+
+-- FOOTER SOCIAL LINKS (JSON array)
+INSERT INTO land_textos (secao, chave, valor) VALUES
+('footer', 'social_links', '[{"platform":"instagram","url":"#"},{"platform":"facebook","url":"#"},{"platform":"linkedin","url":"#"}]');
+```
+
+### 1.8 Tabela: `land_pagamentos`
 Registro de pagamentos.
 
 ```sql
@@ -721,14 +805,14 @@ INSERT INTO land_legal_secoes (documento_id, titulo, conteudo, ordem) VALUES
 
 | Componente | Arquivo | API Utilizada |
 |------------|---------|---------------|
-| Header | `src/components/landing/Header.tsx` | `land_config.asp` |
-| Hero | `src/components/landing/Hero.tsx` | `land_config.asp` |
+| Header | `src/components/landing/Header.tsx` | `land_config.asp`, `land_textos.asp` |
+| Hero | `src/components/landing/Hero.tsx` | `land_textos.asp` |
 | Promotion | `src/components/landing/Promotion.tsx` | `land_promocao.asp` |
-| Benefits | `src/components/landing/Benefits.tsx` | `land_beneficios.asp` |
-| Services | `src/components/landing/Services.tsx` | `land_servicos.asp` |
-| Pricing | `src/components/landing/Pricing.tsx` | `land_precos.asp` |
-| CTA | `src/components/landing/CTA.tsx` | `land_config.asp` |
-| Footer | `src/components/landing/Footer.tsx` | `land_config.asp` |
+| Benefits | `src/components/landing/Benefits.tsx` | `land_beneficios.asp`, `land_textos.asp` |
+| Services | `src/components/landing/Services.tsx` | `land_servicos.asp`, `land_textos.asp` |
+| Pricing | `src/components/landing/Pricing.tsx` | `land_precos.asp`, `land_textos.asp` |
+| CTA | `src/components/landing/CTA.tsx` | `land_textos.asp` |
+| Footer | `src/components/landing/Footer.tsx` | `land_config.asp`, `land_textos.asp` |
 | Cadastro | `src/pages/Cadastro.tsx` | `land_config.asp`, `land_plano.asp`, `land_cadastro.asp` |
 | Pagamento | `src/pages/Pagamento.tsx` | `land_config.asp`, `land_plano.asp`, `land_pagamento.asp` |
 | Termos | `src/pages/Termos.tsx` | `land_config.asp`, `land_legal.asp` |

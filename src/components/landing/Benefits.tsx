@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MessageCircle, Globe, Calendar, Users, Share2, Bell } from 'lucide-react';
-import { fetchBenefits, type Benefit } from '@/lib/api';
+import { fetchBenefits, fetchPageTexts, type Benefit, type PageTexts } from '@/lib/api';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   MessageCircle,
@@ -13,10 +13,14 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export function Benefits() {
   const [benefits, setBenefits] = useState<Benefit[]>([]);
+  const [texts, setTexts] = useState<PageTexts['benefits'] | null>(null);
 
   useEffect(() => {
     fetchBenefits().then(setBenefits);
+    fetchPageTexts().then(data => setTexts(data.benefits));
   }, []);
+
+  if (!texts) return null;
 
   return (
     <section id="beneficios" className="py-20 md:py-32 bg-gradient-subtle">
@@ -24,13 +28,13 @@ export function Benefits() {
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-16">
           <span className="inline-block text-sm font-semibold text-primary uppercase tracking-wider mb-4">
-            Por que escolher
+            {texts.sectionLabel}
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Tudo que você precisa em um só lugar
+            {texts.title}
           </h2>
           <p className="text-muted-foreground">
-            Simplifique sua gestão com ferramentas poderosas integradas ao WhatsApp
+            {texts.subtitle}
           </p>
         </div>
 

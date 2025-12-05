@@ -1,9 +1,14 @@
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, MessageCircle } from 'lucide-react';
+import { fetchPageTexts, PageTexts } from '@/lib/api';
 
 export function CTA() {
-  const navigate = useNavigate();
+  const [texts, setTexts] = useState<PageTexts['cta'] | null>(null);
+
+  useEffect(() => {
+    fetchPageTexts().then(data => setTexts(data.cta));
+  }, []);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -11,6 +16,8 @@ export function CTA() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (!texts) return null;
 
   return (
     <section className="py-20 md:py-32 bg-gradient-hero relative overflow-hidden">
@@ -25,16 +32,15 @@ export function CTA() {
           <div className="inline-flex items-center gap-2 bg-primary-foreground/10 backdrop-blur-sm border border-primary-foreground/20 rounded-full px-4 py-2 mb-8">
             <MessageCircle className="w-4 h-4 text-primary-foreground" />
             <span className="text-sm font-medium text-primary-foreground/90">
-              Integração completa com WhatsApp
+              {texts.badge}
             </span>
           </div>
 
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-primary-foreground mb-6">
-            Pronto para transformar seu negócio?
+            {texts.title}
           </h2>
           <p className="text-lg md:text-xl text-primary-foreground/80 mb-10">
-            Junte-se a milhares de profissionais que já automatizaram seus agendamentos. 
-            Comece hoje com apenas R$ 49,90/mês.
+            {texts.subtitle}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -43,15 +49,15 @@ export function CTA() {
               size="xl"
               onClick={() => scrollToSection('precos')}
             >
-              Começar Agora
+              {texts.ctaPrimary}
               <ArrowRight className="w-5 h-5" />
             </Button>
             <Button
               variant="heroOutline"
               size="xl"
-              onClick={() => window.open('https://wa.me/5511999999999', '_blank')}
+              onClick={() => window.open(`https://wa.me/${texts.whatsappNumber}`, '_blank')}
             >
-              Falar com Consultor
+              {texts.ctaSecondary}
             </Button>
           </div>
         </div>
