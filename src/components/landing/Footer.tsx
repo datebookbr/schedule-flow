@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Calendar, Instagram, Facebook, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
 import { fetchSiteConfig, SiteConfig } from '@/lib/api';
 
@@ -91,20 +92,31 @@ export function Footer() {
               Legal
             </h4>
             <ul className="space-y-3">
-              {[
-                { label: 'Termos de Uso', href: '#' },
-                { label: 'Política de Privacidade', href: '#' },
-                { label: 'Cookies', href: '#' },
-              ].map((item) => (
-                <li key={item.label}>
-                  <a
-                    href={item.href}
-                    className="text-primary-foreground/60 hover:text-primary transition-colors duration-200 text-sm"
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <Link
+                  to="/termos"
+                  className="text-primary-foreground/60 hover:text-primary transition-colors duration-200 text-sm"
+                >
+                  Termos de Uso
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/termos"
+                  onClick={() => setTimeout(() => document.querySelector('button[data-section="privacidade"]')?.dispatchEvent(new MouseEvent('click')), 100)}
+                  className="text-primary-foreground/60 hover:text-primary transition-colors duration-200 text-sm"
+                >
+                  Política de Privacidade
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/termos"
+                  className="text-primary-foreground/60 hover:text-primary transition-colors duration-200 text-sm"
+                >
+                  Cookies
+                </Link>
+              </li>
             </ul>
           </div>
 
