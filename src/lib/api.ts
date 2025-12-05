@@ -10,7 +10,73 @@ export interface SiteConfig {
   tagline?: string;
   whatsapp?: string;
   email?: string;
+  phone?: string;
   address?: string;
+}
+
+// Page Texts - All texts from the landing page
+export interface PageTexts {
+  // Header
+  header: {
+    menuBeneficios: string;
+    menuServicos: string;
+    menuPrecos: string;
+    ctaButton: string;
+  };
+  // Hero
+  hero: {
+    badge: string;
+    titlePart1: string;
+    titleHighlight: string;
+    subtitle: string;
+    ctaPrimary: string;
+    ctaSecondary: string;
+    stats: Array<{ value: string; label: string }>;
+  };
+  // Benefits
+  benefits: {
+    sectionLabel: string;
+    title: string;
+    subtitle: string;
+  };
+  // Services
+  services: {
+    sectionLabel: string;
+    title: string;
+    titleHighlight: string;
+    subtitle: string;
+    ctaButton: string;
+  };
+  // Pricing
+  pricing: {
+    sectionLabel: string;
+    title: string;
+    subtitle: string;
+    popularBadge: string;
+    footnote: string;
+  };
+  // CTA
+  cta: {
+    badge: string;
+    title: string;
+    subtitle: string;
+    ctaPrimary: string;
+    ctaSecondary: string;
+    whatsappNumber: string;
+  };
+  // Footer
+  footer: {
+    description: string;
+    navTitle: string;
+    legalTitle: string;
+    legalTermos: string;
+    legalPrivacidade: string;
+    legalCookies: string;
+    contactTitle: string;
+    copyright: string;
+    developedBy: string;
+    socialLinks: Array<{ platform: string; url: string }>;
+  };
 }
 
 // Promotion Configuration
@@ -111,7 +177,73 @@ export const mockSiteConfig: SiteConfig = {
   tagline: 'Sistema de Agendamentos',
   whatsapp: '5511999999999',
   email: 'contato@datebook.com.br',
-  address: 'São Paulo, SP'
+  phone: '(11) 99999-9999',
+  address: 'São Paulo, SP - Brasil'
+};
+
+export const mockPageTexts: PageTexts = {
+  header: {
+    menuBeneficios: 'Benefícios',
+    menuServicos: 'Serviços',
+    menuPrecos: 'Preços',
+    ctaButton: 'Contrate Agora'
+  },
+  hero: {
+    badge: 'Sistema completo de agendamentos',
+    titlePart1: 'Transforme seu negócio com',
+    titleHighlight: 'agendamentos inteligentes',
+    subtitle: 'Sistema integrado ao WhatsApp para profissionais de saúde e beleza. Automatize confirmações, gerencie sua agenda e fidelize seus clientes.',
+    ctaPrimary: 'Contrate Agora',
+    ctaSecondary: 'Ver Serviços',
+    stats: [
+      { value: '5.000+', label: 'Profissionais' },
+      { value: '100k+', label: 'Agendamentos' },
+      { value: '99%', label: 'Satisfação' }
+    ]
+  },
+  benefits: {
+    sectionLabel: 'Por que escolher',
+    title: 'Tudo que você precisa em um só lugar',
+    subtitle: 'Simplifique sua gestão com ferramentas poderosas integradas ao WhatsApp'
+  },
+  services: {
+    sectionLabel: 'Serviços Inclusos',
+    title: 'Tudo que você precisa para',
+    titleHighlight: 'crescer seu negócio',
+    subtitle: 'Nossa plataforma oferece todas as ferramentas necessárias para gerenciar seus agendamentos de forma profissional e eficiente.',
+    ctaButton: 'Contratar Agora'
+  },
+  pricing: {
+    sectionLabel: 'Planos e Preços',
+    title: 'Escolha o plano ideal para você',
+    subtitle: 'Comece com nosso plano essencial e escale conforme seu negócio cresce',
+    popularBadge: 'Mais Popular',
+    footnote: '* Valores para pagamento mensal. Economize até 20% no plano anual.'
+  },
+  cta: {
+    badge: 'Integração completa com WhatsApp',
+    title: 'Pronto para transformar seu negócio?',
+    subtitle: 'Junte-se a milhares de profissionais que já automatizaram seus agendamentos. Comece hoje com apenas R$ 49,90/mês.',
+    ctaPrimary: 'Começar Agora',
+    ctaSecondary: 'Falar com Consultor',
+    whatsappNumber: '5511999999999'
+  },
+  footer: {
+    description: 'Sistema completo de agendamentos integrado ao WhatsApp para profissionais de saúde e beleza.',
+    navTitle: 'Navegação',
+    legalTitle: 'Legal',
+    legalTermos: 'Termos de Uso',
+    legalPrivacidade: 'Política de Privacidade',
+    legalCookies: 'Cookies',
+    contactTitle: 'Contato',
+    copyright: 'Todos os direitos reservados.',
+    developedBy: 'Desenvolvido com ❤️ no Brasil',
+    socialLinks: [
+      { platform: 'instagram', url: '#' },
+      { platform: 'facebook', url: '#' },
+      { platform: 'linkedin', url: '#' }
+    ]
+  }
 };
 
 export const mockPromotion: PromotionConfig = {
@@ -469,6 +601,13 @@ export async function fetchSiteConfig(): Promise<SiteConfig> {
   return Promise.resolve(mockSiteConfig);
 }
 
+export async function fetchPageTexts(): Promise<PageTexts> {
+  // TODO: Replace with actual API call
+  // const response = await fetch(`${API_BASE_URL}/land_textos.asp`);
+  // return response.json();
+  return Promise.resolve(mockPageTexts);
+}
+
 export async function fetchPromotion(): Promise<PromotionConfig | null> {
   // TODO: Replace with actual API call
   // const response = await fetch(`${API_BASE_URL}/land_promocao.asp`);
@@ -504,11 +643,11 @@ export async function fetchPricing(): Promise<PricingPlan[]> {
   return Promise.resolve(mockPricing);
 }
 
-export async function fetchPlanById(planId: string): Promise<PricingPlan | null> {
+export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
   // TODO: Replace with actual API call
-  // const response = await fetch(`${API_BASE_URL}/land_plano.asp?id=${planId}`);
+  // const response = await fetch(`${API_BASE_URL}/land_plano.asp?id=${id}`);
   // return response.json();
-  const plan = mockPricing.find(p => p.id === planId);
+  const plan = mockPricing.find(p => p.id === id);
   return Promise.resolve(plan || null);
 }
 
@@ -543,8 +682,8 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
     return Promise.resolve({
       success: true,
       transactionId: 'TXN_' + Date.now(),
-      pixCode: '00020126580014br.gov.bcb.pix0136a629532e-7693-4846-835d-09e3ee8e2f1e5204000053039865802BR5925DATEBOOK SISTEMAS LTDA6009SAO PAULO62070503***6304E2CA',
-      pixQrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      pixCode: '00020126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-426614174000',
+      pixQrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=PIX_CODE_HERE',
       message: 'PIX gerado com sucesso!'
     });
   }
@@ -552,6 +691,6 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
   return Promise.resolve({
     success: true,
     transactionId: 'TXN_' + Date.now(),
-    message: 'Pagamento processado com sucesso!'
+    message: 'Pagamento aprovado!'
   });
 }

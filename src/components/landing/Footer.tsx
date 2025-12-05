@@ -1,14 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Instagram, Facebook, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
-import { fetchSiteConfig, SiteConfig } from '@/lib/api';
+import { fetchSiteConfig, fetchPageTexts, SiteConfig, PageTexts } from '@/lib/api';
+
+const socialIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  instagram: Instagram,
+  facebook: Facebook,
+  linkedin: Linkedin,
+};
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
   const [siteConfig, setSiteConfig] = useState<SiteConfig>({ name: 'Datebook' });
+  const [texts, setTexts] = useState<PageTexts['footer'] | null>(null);
 
   useEffect(() => {
     fetchSiteConfig().then(setSiteConfig);
+    fetchPageTexts().then(data => setTexts(data.footer));
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -17,6 +25,14 @@ export function Footer() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (!texts) return null;
+
+  const menuItems = [
+    { label: texts.navTitle === 'Navegação' ? 'Benefícios' : texts.navTitle, id: 'beneficios' },
+    { label: 'Serviços', id: 'servicos' },
+    { label: 'Preços', id: 'precos' },
+  ];
 
   return (
     <footer className="bg-foreground text-primary-foreground">
@@ -41,39 +57,33 @@ export function Footer() {
               )}
             </div>
             <p className="text-primary-foreground/60 text-sm mb-6">
-              Sistema completo de agendamentos integrado ao WhatsApp para 
-              profissionais de saúde e beleza.
+              {texts.description}
             </p>
             <div className="flex items-center gap-4">
-              {[
-                { icon: Instagram, href: '#' },
-                { icon: Facebook, href: '#' },
-                { icon: Linkedin, href: '#' },
-              ].map((social, index) => (
-                <a
-                  key={index}
-                  href={social.href}
-                  className="w-9 h-9 rounded-lg bg-primary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors duration-200"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <social.icon className="w-4 h-4" />
-                </a>
-              ))}
+              {texts.socialLinks.map((social, index) => {
+                const IconComponent = socialIconMap[social.platform] || Instagram;
+                return (
+                  <a
+                    key={index}
+                    href={social.url}
+                    className="w-9 h-9 rounded-lg bg-primary-foreground/10 flex items-center justify-center hover:bg-primary transition-colors duration-200"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <IconComponent className="w-4 h-4" />
+                  </a>
+                );
+              })}
             </div>
           </div>
 
           {/* Links Column */}
           <div>
             <h4 className="font-semibold text-sm uppercase tracking-wider mb-4">
-              Navegação
+              {texts.navTitle}
             </h4>
             <ul className="space-y-3">
-              {[
-                { label: 'Benefícios', id: 'beneficios' },
-                { label: 'Serviços', id: 'servicos' },
-                { label: 'Preços', id: 'precos' },
-              ].map((item) => (
+              {menuItems.map((item) => (
                 <li key={item.id}>
                   <button
                     onClick={() => scrollToSection(item.id)}
@@ -89,7 +99,7 @@ export function Footer() {
           {/* Legal Column */}
           <div>
             <h4 className="font-semibold text-sm uppercase tracking-wider mb-4">
-              Legal
+              {texts.legalTitle}
             </h4>
             <ul className="space-y-3">
               <li>
@@ -97,7 +107,7 @@ export function Footer() {
                   to="/termos"
                   className="text-primary-foreground/60 hover:text-primary transition-colors duration-200 text-sm"
                 >
-                  Termos de Uso
+                  {texts.legalTermos}
                 </Link>
               </li>
               <li>
@@ -106,7 +116,7 @@ export function Footer() {
                   onClick={() => setTimeout(() => document.querySelector('button[data-section="privacidade"]')?.dispatchEvent(new MouseEvent('click')), 100)}
                   className="text-primary-foreground/60 hover:text-primary transition-colors duration-200 text-sm"
                 >
-                  Política de Privacidade
+                  {texts.legalPrivacidade}
                 </Link>
               </li>
               <li>
@@ -114,7 +124,7 @@ export function Footer() {
                   to="/termos"
                   className="text-primary-foreground/60 hover:text-primary transition-colors duration-200 text-sm"
                 >
-                  Cookies
+                  {texts.legalCookies}
                 </Link>
               </li>
             </ul>
@@ -123,20 +133,20 @@ export function Footer() {
           {/* Contact Column */}
           <div>
             <h4 className="font-semibold text-sm uppercase tracking-wider mb-4">
-              Contato
+              {texts.contactTitle}
             </h4>
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-primary-foreground/60 text-sm">
                 <Mail className="w-4 h-4 flex-shrink-0" />
-                contato@datebook.com.br
+                {siteConfig.email}
               </li>
               <li className="flex items-center gap-3 text-primary-foreground/60 text-sm">
                 <Phone className="w-4 h-4 flex-shrink-0" />
-                (11) 99999-9999
+                {siteConfig.phone}
               </li>
               <li className="flex items-start gap-3 text-primary-foreground/60 text-sm">
                 <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                São Paulo, SP - Brasil
+                {siteConfig.address}
               </li>
             </ul>
           </div>
@@ -146,10 +156,10 @@ export function Footer() {
         <div className="border-t border-primary-foreground/10 mt-12 pt-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-primary-foreground/40 text-sm">
-              © {currentYear} {siteConfig.name}. Todos os direitos reservados.
+              © {currentYear} {siteConfig.name}. {texts.copyright}
             </p>
             <p className="text-primary-foreground/40 text-sm">
-              Desenvolvido com ❤️ no Brasil
+              {texts.developedBy}
             </p>
           </div>
         </div>
