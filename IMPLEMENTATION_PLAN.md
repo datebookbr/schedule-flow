@@ -557,6 +557,134 @@ Consulta status do pagamento (útil para PIX).
 
 ---
 
+### 2.9 GET `/api/land_promocao.asp`
+Retorna configuração da promoção (quando ativa).
+
+**Response JSON (Promoção Ativa):**
+```json
+{
+  "success": true,
+  "data": {
+    "active": true,
+    "title": "🎉 Experimente 30 dias GRÁTIS!",
+    "description": "Aproveite nossa promoção por tempo limitado e teste todos os recursos sem compromisso.",
+    "ctaText": "Começar Teste Grátis",
+    "trialDays": 30,
+    "expiresAt": "2024-12-31"
+  }
+}
+```
+
+**Response JSON (Promoção Inativa):**
+```json
+{
+  "success": true,
+  "data": {
+    "active": false
+  }
+}
+```
+
+**Tabela MySQL:**
+```sql
+CREATE TABLE land_promocao (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    descricao TEXT NOT NULL,
+    texto_botao VARCHAR(100) NOT NULL,
+    dias_trial INT DEFAULT 30,
+    data_inicio DATE,
+    data_fim DATE,
+    ativo TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Dados iniciais
+INSERT INTO land_promocao (titulo, descricao, texto_botao, dias_trial, data_inicio, data_fim, ativo) VALUES
+('🎉 Experimente 30 dias GRÁTIS!', 'Aproveite nossa promoção por tempo limitado e teste todos os recursos sem compromisso.', 'Começar Teste Grátis', 30, '2024-01-01', '2024-12-31', 1);
+```
+
+---
+
+### 2.10 GET `/api/land_legal.asp`
+Retorna conteúdo dos documentos legais (Termos, Privacidade, Cookies).
+
+**Response JSON:**
+```json
+{
+  "success": true,
+  "data": {
+    "lastUpdate": "01 de Dezembro de 2024",
+    "termos": {
+      "title": "Termos de Uso",
+      "sections": [
+        {
+          "title": "1. Aceitação dos Termos",
+          "content": "Ao acessar e utilizar os serviços do Datebook..."
+        },
+        {
+          "title": "2. Descrição dos Serviços",
+          "content": "O Datebook é uma plataforma de agendamento online..."
+        }
+      ]
+    },
+    "privacidade": {
+      "title": "Política de Privacidade",
+      "sections": [
+        {
+          "title": "1. Informações que Coletamos",
+          "content": "Coletamos diferentes tipos de informações..."
+        }
+      ]
+    },
+    "cookies": {
+      "title": "Política de Cookies",
+      "sections": [
+        {
+          "title": "1. O que são Cookies",
+          "content": "Cookies são pequenos arquivos de texto..."
+        }
+      ]
+    }
+  }
+}
+```
+
+**Tabelas MySQL:**
+```sql
+CREATE TABLE land_legal_documentos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tipo ENUM('termos', 'privacidade', 'cookies') NOT NULL,
+    titulo VARCHAR(200) NOT NULL,
+    ultima_atualizacao DATE,
+    ativo TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE land_legal_secoes (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    documento_id INT NOT NULL,
+    titulo VARCHAR(200) NOT NULL,
+    conteudo TEXT NOT NULL,
+    ordem INT DEFAULT 0,
+    FOREIGN KEY (documento_id) REFERENCES land_legal_documentos(id) ON DELETE CASCADE
+);
+
+-- Dados iniciais
+INSERT INTO land_legal_documentos (tipo, titulo, ultima_atualizacao) VALUES
+('termos', 'Termos de Uso', '2024-12-01'),
+('privacidade', 'Política de Privacidade', '2024-12-01'),
+('cookies', 'Política de Cookies', '2024-12-01');
+
+-- Seções de exemplo (documento_id = 1 para Termos)
+INSERT INTO land_legal_secoes (documento_id, titulo, conteudo, ordem) VALUES
+(1, '1. Aceitação dos Termos', 'Ao acessar e utilizar os serviços do Datebook ("Plataforma"), você concorda em cumprir e estar vinculado a estes Termos de Uso...', 1),
+(1, '2. Descrição dos Serviços', 'O Datebook é uma plataforma de agendamento online que permite a profissionais de saúde, beleza e bem-estar gerenciar suas agendas...', 2);
+```
+
+---
+
 ## 3. Fluxo de Contratação
 
 ```
@@ -595,6 +723,7 @@ Consulta status do pagamento (útil para PIX).
 |------------|---------|---------------|
 | Header | `src/components/landing/Header.tsx` | `land_config.asp` |
 | Hero | `src/components/landing/Hero.tsx` | `land_config.asp` |
+| Promotion | `src/components/landing/Promotion.tsx` | `land_promocao.asp` |
 | Benefits | `src/components/landing/Benefits.tsx` | `land_beneficios.asp` |
 | Services | `src/components/landing/Services.tsx` | `land_servicos.asp` |
 | Pricing | `src/components/landing/Pricing.tsx` | `land_precos.asp` |
@@ -602,6 +731,7 @@ Consulta status do pagamento (útil para PIX).
 | Footer | `src/components/landing/Footer.tsx` | `land_config.asp` |
 | Cadastro | `src/pages/Cadastro.tsx` | `land_config.asp`, `land_plano.asp`, `land_cadastro.asp` |
 | Pagamento | `src/pages/Pagamento.tsx` | `land_config.asp`, `land_plano.asp`, `land_pagamento.asp` |
+| Termos | `src/pages/Termos.tsx` | `land_config.asp`, `land_legal.asp` |
 
 ---
 
