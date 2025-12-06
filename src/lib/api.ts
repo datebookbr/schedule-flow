@@ -169,6 +169,26 @@ export interface PaymentResponse {
   message?: string;
 }
 
+// Portfolio Establishment Interface
+export interface PortfolioEstabelecimento {
+  id: string;
+  nome: string;
+  segmento: string;
+  cidade: string;
+  descricao: string;
+  imagem: string;
+  avaliacao?: number;
+  totalAvaliacoes?: number;
+}
+
+// Portfolio Data Interface
+export interface PortfolioData {
+  ativo: boolean;
+  titulo: string;
+  subtitulo: string;
+  estabelecimentos: PortfolioEstabelecimento[];
+}
+
 // Mock Data - Replace with actual API calls when endpoints are ready
 
 export const mockSiteConfig: SiteConfig = {
@@ -693,4 +713,80 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
     transactionId: 'TXN_' + Date.now(),
     message: 'Pagamento aprovado!'
   });
+}
+
+// Mock Portfolio Data
+export const mockPortfolio: PortfolioData = {
+  ativo: true,
+  titulo: 'Quem já usa o Datebook',
+  subtitulo: 'Conheça alguns dos estabelecimentos que confiam em nossa plataforma para gerenciar seus agendamentos',
+  estabelecimentos: [
+    {
+      id: '1',
+      nome: 'Studio Hair & Beauty',
+      segmento: 'Salão de Beleza',
+      cidade: 'São Paulo, SP',
+      descricao: 'Salão completo especializado em coloração, cortes modernos e tratamentos capilares. Atendemos com hora marcada para garantir exclusividade.',
+      imagem: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200&h=200&fit=crop',
+      avaliacao: 4.9,
+      totalAvaliacoes: 328
+    },
+    {
+      id: '2',
+      nome: 'Clínica Odonto Sorriso',
+      segmento: 'Clínica Odontológica',
+      cidade: 'Rio de Janeiro, RJ',
+      descricao: 'Clínica odontológica com equipamentos modernos, especializada em estética dental, implantes e ortodontia.',
+      imagem: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=200&h=200&fit=crop',
+      avaliacao: 4.8,
+      totalAvaliacoes: 156
+    },
+    {
+      id: '3',
+      nome: 'Barbearia Old School',
+      segmento: 'Barbearia',
+      cidade: 'Belo Horizonte, MG',
+      descricao: 'Barbearia tradicional com ambiente vintage, oferecendo cortes clássicos e modernos, barba e tratamentos masculinos.',
+      imagem: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=200&h=200&fit=crop',
+      avaliacao: 4.9,
+      totalAvaliacoes: 89
+    },
+    {
+      id: '4',
+      nome: 'Psicóloga Marina Santos',
+      segmento: 'Psicologia',
+      cidade: 'Curitiba, PR',
+      descricao: 'Atendimento psicológico presencial e online, especializada em terapia cognitivo-comportamental e ansiedade.',
+      imagem: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop',
+      avaliacao: 5.0,
+      totalAvaliacoes: 67
+    },
+    {
+      id: '5',
+      nome: 'Espaço Zen Massoterapia',
+      segmento: 'Massoterapia',
+      cidade: 'Florianópolis, SC',
+      descricao: 'Centro de massoterapia e bem-estar com diversas técnicas de massagem relaxante, terapêutica e drenagem linfática.',
+      imagem: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=200&h=200&fit=crop',
+      avaliacao: 4.7,
+      totalAvaliacoes: 234
+    },
+    {
+      id: '6',
+      nome: 'Nail Designer Paula',
+      segmento: 'Esmalteria',
+      cidade: 'Porto Alegre, RS',
+      descricao: 'Especialista em unhas em gel, nail art e alongamento. Atendimento personalizado com produtos de alta qualidade.',
+      imagem: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=200&h=200&fit=crop',
+      avaliacao: 4.8,
+      totalAvaliacoes: 412
+    }
+  ]
+};
+
+export async function fetchPortfolio(): Promise<PortfolioData> {
+  // TODO: Replace with actual API call
+  // const response = await fetch(`${API_BASE_URL}/land_portfolio.asp`);
+  // return response.json();
+  return Promise.resolve(mockPortfolio);
 }

@@ -767,6 +767,68 @@ INSERT INTO land_legal_secoes (documento_id, titulo, conteudo, ordem) VALUES
 (1, '2. Descrição dos Serviços', 'O Datebook é uma plataforma de agendamento online que permite a profissionais de saúde, beleza e bem-estar gerenciar suas agendas...', 2);
 ```
 
+### 2.12 API: `/api/land_portfolio.asp`
+Retorna estabelecimentos para exibição no portfólio.
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "data": {
+    "ativo": true,
+    "titulo": "Quem já usa o Datebook",
+    "subtitulo": "Conheça alguns dos estabelecimentos que confiam em nossa plataforma",
+    "estabelecimentos": [
+      {
+        "id": "1",
+        "nome": "Studio Hair & Beauty",
+        "segmento": "Salão de Beleza",
+        "cidade": "São Paulo, SP",
+        "descricao": "Salão completo especializado em coloração...",
+        "imagem": "https://exemplo.com/foto.jpg",
+        "avaliacao": 4.9,
+        "totalAvaliacoes": 328
+      }
+    ]
+  }
+}
+```
+
+**Tabelas MySQL:**
+```sql
+CREATE TABLE land_portfolio_config (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    ativo TINYINT(1) DEFAULT 1,
+    titulo VARCHAR(200) NOT NULL,
+    subtitulo TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE land_portfolio_estabelecimentos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(200) NOT NULL,
+    segmento VARCHAR(100) NOT NULL,
+    cidade VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    imagem VARCHAR(500),
+    avaliacao DECIMAL(2,1) DEFAULT NULL,
+    total_avaliacoes INT DEFAULT 0,
+    ordem INT DEFAULT 0,
+    ativo TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Dados iniciais
+INSERT INTO land_portfolio_config (ativo, titulo, subtitulo) VALUES
+(1, 'Quem já usa o Datebook', 'Conheça alguns dos estabelecimentos que confiam em nossa plataforma para gerenciar seus agendamentos');
+
+INSERT INTO land_portfolio_estabelecimentos (nome, segmento, cidade, descricao, imagem, avaliacao, total_avaliacoes, ordem) VALUES
+('Studio Hair & Beauty', 'Salão de Beleza', 'São Paulo, SP', 'Salão completo especializado em coloração, cortes modernos e tratamentos capilares.', 'https://exemplo.com/foto1.jpg', 4.9, 328, 1),
+('Clínica Odonto Sorriso', 'Clínica Odontológica', 'Rio de Janeiro, RJ', 'Clínica odontológica com equipamentos modernos.', 'https://exemplo.com/foto2.jpg', 4.8, 156, 2),
+('Barbearia Old School', 'Barbearia', 'Belo Horizonte, MG', 'Barbearia tradicional com ambiente vintage.', 'https://exemplo.com/foto3.jpg', 4.9, 89, 3);
+```
+
 ---
 
 ## 3. Fluxo de Contratação
@@ -810,6 +872,7 @@ INSERT INTO land_legal_secoes (documento_id, titulo, conteudo, ordem) VALUES
 | Promotion | `src/components/landing/Promotion.tsx` | `land_promocao.asp` |
 | Benefits | `src/components/landing/Benefits.tsx` | `land_beneficios.asp`, `land_textos.asp` |
 | Services | `src/components/landing/Services.tsx` | `land_servicos.asp`, `land_textos.asp` |
+| Portfolio | `src/components/landing/Portfolio.tsx` | `land_portfolio.asp` |
 | Pricing | `src/components/landing/Pricing.tsx` | `land_precos.asp`, `land_textos.asp` |
 | CTA | `src/components/landing/CTA.tsx` | `land_textos.asp` |
 | Footer | `src/components/landing/Footer.tsx` | `land_config.asp`, `land_textos.asp` |
