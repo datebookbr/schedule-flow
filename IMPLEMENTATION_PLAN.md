@@ -331,7 +331,80 @@ Retorna configurações do site.
 
 ---
 
-### 2.2 GET `/api/land_beneficios.asp`
+### 2.2 GET `/api/land_textos.asp`
+Retorna todos os textos da landing page organizados por seção.
+
+**Response JSON:**
+```json
+{
+  "header": {
+    "menuBeneficios": "Benefícios",
+    "menuServicos": "Serviços",
+    "menuPrecos": "Preços",
+    "ctaButton": "Contrate Agora"
+  },
+  "hero": {
+    "badge": "Sistema completo de agendamentos",
+    "titlePart1": "Transforme seu negócio com",
+    "titleHighlight": "agendamentos inteligentes",
+    "subtitle": "Sistema integrado ao WhatsApp para profissionais de saúde e beleza. Automatize confirmações, gerencie sua agenda e fidelize seus clientes.",
+    "ctaPrimary": "Contrate Agora",
+    "ctaSecondary": "Ver Serviços",
+    "stats": [
+      { "value": "5.000+", "label": "Profissionais" },
+      { "value": "100k+", "label": "Agendamentos" },
+      { "value": "99%", "label": "Satisfação" }
+    ]
+  },
+  "benefits": {
+    "sectionLabel": "Por que escolher",
+    "title": "Tudo que você precisa em um só lugar",
+    "subtitle": "Simplifique sua gestão com ferramentas poderosas integradas ao WhatsApp"
+  },
+  "services": {
+    "sectionLabel": "Serviços Inclusos",
+    "title": "Tudo que você precisa para",
+    "titleHighlight": "crescer seu negócio",
+    "subtitle": "Nossa plataforma oferece todas as ferramentas necessárias para gerenciar seus agendamentos de forma profissional e eficiente.",
+    "ctaButton": "Contratar Agora"
+  },
+  "pricing": {
+    "sectionLabel": "Planos e Preços",
+    "title": "Escolha o plano ideal para você",
+    "subtitle": "Comece com nosso plano essencial e escale conforme seu negócio cresce",
+    "popularBadge": "Mais Popular",
+    "footnote": "* Valores para pagamento mensal. Economize até 20% no plano anual."
+  },
+  "cta": {
+    "badge": "Integração completa com WhatsApp",
+    "title": "Pronto para transformar seu negócio?",
+    "subtitle": "Junte-se a milhares de profissionais que já automatizaram seus agendamentos. Comece hoje com apenas R$ 49,90/mês.",
+    "ctaPrimary": "Começar Agora",
+    "ctaSecondary": "Falar com Consultor",
+    "whatsappNumber": "5511999999999"
+  },
+  "footer": {
+    "description": "Sistema completo de agendamentos integrado ao WhatsApp para profissionais de saúde e beleza.",
+    "navTitle": "Navegação",
+    "legalTitle": "Legal",
+    "legalTermos": "Termos de Uso",
+    "legalPrivacidade": "Política de Privacidade",
+    "legalCookies": "Cookies",
+    "contactTitle": "Contato",
+    "copyright": "Todos os direitos reservados.",
+    "developedBy": "Desenvolvido com ❤️ no Brasil",
+    "socialLinks": [
+      { "platform": "instagram", "url": "https://instagram.com/datebook" },
+      { "platform": "facebook", "url": "https://facebook.com/datebook" },
+      { "platform": "linkedin", "url": "https://linkedin.com/company/datebook" }
+    ]
+  }
+}
+```
+
+---
+
+### 2.3 GET `/api/land_beneficios.asp`
 Retorna lista de benefícios.
 
 **Response JSON:**
