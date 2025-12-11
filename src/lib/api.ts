@@ -34,6 +34,39 @@ debugLog('ENV', `Hostname: ${window.location.hostname}`);
 debugLog('ENV', `isDevelopment: ${isDevelopment}`);
 debugLog('ENV', `API_BASE_URL: ${API_BASE_URL}`);
 
+// Helper function to extract text from fields that might be objects like {text, included}
+// This normalizes API responses that return structured text objects instead of plain strings
+function normalizeTextField(value: unknown): unknown {
+  if (value === null || value === undefined) {
+    return value;
+  }
+  
+  // If it's an object with 'text' property, extract the text
+  if (typeof value === 'object' && value !== null && 'text' in value) {
+    const obj = value as { text: string; included?: boolean };
+    return obj.text;
+  }
+  
+  // If it's an array, normalize each element
+  if (Array.isArray(value)) {
+    return value.map(item => normalizeTextField(item));
+  }
+  
+  // If it's an object (but not with 'text'), recursively normalize all properties
+  if (typeof value === 'object') {
+    const normalized: Record<string, unknown> = {};
+    for (const key in value) {
+      normalized[key] = normalizeTextField((value as Record<string, unknown>)[key]);
+    }
+    return normalized;
+  }
+  
+  // For primitives (strings, numbers, booleans), return as-is
+  return value;
+}
+
+debugLog('API', 'Função normalizeTextField carregada para tratar campos {text, included}');
+
 // Site Configuration
 export interface SiteConfig {
   name: string;
@@ -474,13 +507,21 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
       const parsed = JSON.parse(text);
       debugLog('API', `${apiName} parseado com sucesso!`, parsed);
       
+      let result: unknown;
+      
       // Check if response is wrapped in {success, data} format
       if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
         debugLog('API', `${apiName} - Extraindo .data do response wrapper`, parsed.data);
-        return parsed.data as T;
+        result = parsed.data;
+      } else {
+        result = parsed;
       }
       
-      return parsed as T;
+      // Normalize fields that might be {text, included} objects
+      const normalized = normalizeTextField(result);
+      debugLog('API', `${apiName} - Dados normalizados`, normalized);
+      
+      return normalized as T;
     } catch (parseError) {
       debugError('API', `Erro ao parsear JSON de ${apiName}:`, {
         error: parseError,
