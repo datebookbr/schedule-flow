@@ -5,6 +5,35 @@ const API_BASE_URL = '/api';
 const isDevelopment = window.location.hostname.includes('lovableproject.com') || 
                        window.location.hostname === 'localhost';
 
+// Debug mode - set to true to see detailed logs
+const DEBUG_MODE = true;
+
+function debugLog(category: string, message: string, data?: unknown) {
+  if (DEBUG_MODE) {
+    const timestamp = new Date().toISOString();
+    console.log(`%c[${timestamp}] [${category}]`, 'color: #0ea5e9; font-weight: bold;', message, data || '');
+  }
+}
+
+function debugError(category: string, message: string, error?: unknown) {
+  if (DEBUG_MODE) {
+    const timestamp = new Date().toISOString();
+    console.error(`%c[${timestamp}] [${category}] ERROR:`, 'color: #ef4444; font-weight: bold;', message, error || '');
+  }
+}
+
+function debugWarn(category: string, message: string, data?: unknown) {
+  if (DEBUG_MODE) {
+    const timestamp = new Date().toISOString();
+    console.warn(`%c[${timestamp}] [${category}] WARNING:`, 'color: #f59e0b; font-weight: bold;', message, data || '');
+  }
+}
+
+// Log environment info on load
+debugLog('ENV', `Hostname: ${window.location.hostname}`);
+debugLog('ENV', `isDevelopment: ${isDevelopment}`);
+debugLog('ENV', `API_BASE_URL: ${API_BASE_URL}`);
+
 // Site Configuration
 export interface SiteConfig {
   name: string;
@@ -393,97 +422,161 @@ const fallbackPortfolio: PortfolioData = {
 
 // ============= API FUNCTIONS WITH FALLBACK =============
 
-async function safeFetch<T>(url: string, fallback: T): Promise<T> {
+async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<T> {
+  debugLog('API', `Iniciando fetch: ${apiName}`, { url, isDevelopment });
+  
   if (isDevelopment) {
-    console.log(`[DEV MODE] Using fallback data for: ${url}`);
+    debugWarn('API', `[DEV MODE] Usando fallback para: ${apiName}`, { url });
     return fallback;
   }
   
   try {
+    debugLog('API', `Fazendo requisição para: ${url}`);
+    const startTime = performance.now();
+    
     const response = await fetch(url);
+    const endTime = performance.now();
+    
+    debugLog('API', `Resposta recebida de ${apiName}`, {
+      status: response.status,
+      statusText: response.statusText,
+      contentType: response.headers.get('content-type'),
+      tempoMs: Math.round(endTime - startTime)
+    });
+    
     const text = await response.text();
     
+    debugLog('API', `Conteúdo raw de ${apiName} (primeiros 200 chars):`, text.substring(0, 200));
+    
     // Check if response is HTML (error page) instead of JSON
-    if (text.startsWith('<!') || text.startsWith('<html')) {
-      console.warn(`API returned HTML instead of JSON: ${url}`);
+    if (text.startsWith('<!') || text.startsWith('<html') || text.startsWith('<HTML')) {
+      debugError('API', `${apiName} retornou HTML ao invés de JSON!`, {
+        url,
+        status: response.status,
+        primeiros100chars: text.substring(0, 100)
+      });
       return fallback;
     }
     
-    return JSON.parse(text) as T;
+    // Check for empty response
+    if (!text || text.trim() === '') {
+      debugError('API', `${apiName} retornou resposta vazia!`, { url });
+      return fallback;
+    }
+    
+    try {
+      const parsed = JSON.parse(text) as T;
+      debugLog('API', `${apiName} parseado com sucesso!`, parsed);
+      return parsed;
+    } catch (parseError) {
+      debugError('API', `Erro ao parsear JSON de ${apiName}:`, {
+        error: parseError,
+        text: text.substring(0, 500)
+      });
+      return fallback;
+    }
+    
   } catch (error) {
-    console.error(`Error fetching ${url}:`, error);
+    debugError('API', `Erro de rede em ${apiName}:`, {
+      url,
+      error: error instanceof Error ? { message: error.message, stack: error.stack } : error
+    });
     return fallback;
   }
 }
 
 export async function fetchSiteConfig(): Promise<SiteConfig> {
-  return safeFetch(`${API_BASE_URL}/land_config.asp`, fallbackSiteConfig);
+  return safeFetch(`${API_BASE_URL}/land_config.asp`, fallbackSiteConfig, 'fetchSiteConfig');
 }
 
 export async function fetchPageTexts(): Promise<PageTexts> {
-  return safeFetch(`${API_BASE_URL}/land_textos.asp`, fallbackPageTexts);
+  return safeFetch(`${API_BASE_URL}/land_textos.asp`, fallbackPageTexts, 'fetchPageTexts');
 }
 
 export async function fetchPromotion(): Promise<PromotionConfig | null> {
-  return safeFetch(`${API_BASE_URL}/land_promocao.asp`, fallbackPromotion);
+  return safeFetch(`${API_BASE_URL}/land_promocao.asp`, fallbackPromotion, 'fetchPromotion');
 }
 
 export async function fetchLegalContent(): Promise<LegalContent> {
-  return safeFetch(`${API_BASE_URL}/land_legal.asp`, fallbackLegalContent);
+  return safeFetch(`${API_BASE_URL}/land_legal.asp`, fallbackLegalContent, 'fetchLegalContent');
 }
 
 export async function fetchBenefits(): Promise<Benefit[]> {
-  return safeFetch(`${API_BASE_URL}/land_beneficios.asp`, fallbackBenefits);
+  return safeFetch(`${API_BASE_URL}/land_beneficios.asp`, fallbackBenefits, 'fetchBenefits');
 }
 
 export async function fetchServices(): Promise<Service[]> {
-  return safeFetch(`${API_BASE_URL}/land_servicos.asp`, fallbackServices);
+  return safeFetch(`${API_BASE_URL}/land_servicos.asp`, fallbackServices, 'fetchServices');
 }
 
 export async function fetchPricing(): Promise<PricingPlan[]> {
-  return safeFetch(`${API_BASE_URL}/land_precos.asp`, fallbackPricing);
+  return safeFetch(`${API_BASE_URL}/land_precos.asp`, fallbackPricing, 'fetchPricing');
 }
 
 export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
+  debugLog('API', `fetchPlanById iniciado`, { id, isDevelopment });
+  
   if (isDevelopment) {
-    return fallbackPricing.find(p => p.id === id) || null;
+    const plan = fallbackPricing.find(p => p.id === id) || null;
+    debugWarn('API', `[DEV MODE] Usando fallback para fetchPlanById`, { id, encontrado: !!plan });
+    return plan;
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/land_plano.asp?id=${id}`);
+    const url = `${API_BASE_URL}/land_plano.asp?id=${id}`;
+    debugLog('API', `Fazendo requisição para: ${url}`);
+    
+    const response = await fetch(url);
     const text = await response.text();
+    
+    debugLog('API', `fetchPlanById resposta raw:`, text.substring(0, 200));
+    
     if (text.startsWith('<!') || text.startsWith('<html')) {
+      debugError('API', `fetchPlanById retornou HTML!`, { id });
       return fallbackPricing.find(p => p.id === id) || null;
     }
-    return JSON.parse(text);
+    
+    const parsed = JSON.parse(text);
+    debugLog('API', `fetchPlanById parseado com sucesso:`, parsed);
+    return parsed;
   } catch (error) {
-    console.error(`Error fetching plan ${id}:`, error);
+    debugError('API', `Erro em fetchPlanById:`, { id, error });
     return fallbackPricing.find(p => p.id === id) || null;
   }
 }
 
 export async function registerCustomer(data: CustomerData): Promise<{ success: boolean; customerId?: string; message?: string }> {
+  debugLog('API', `registerCustomer iniciado`, { data, isDevelopment });
+  
   if (isDevelopment) {
-    console.log('[DEV MODE] Simulating customer registration:', data);
+    debugWarn('API', `[DEV MODE] Simulando registerCustomer`);
     return { success: true, customerId: 'dev-' + Date.now(), message: 'Cadastro simulado com sucesso!' };
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/land_cadastro.asp`, {
+    const url = `${API_BASE_URL}/land_cadastro.asp`;
+    debugLog('API', `Fazendo POST para: ${url}`, data);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return response.json();
+    
+    const result = await response.json();
+    debugLog('API', `registerCustomer resposta:`, result);
+    return result;
   } catch (error) {
-    console.error('Error registering customer:', error);
+    debugError('API', `Erro em registerCustomer:`, error);
     return { success: false, message: 'Erro ao processar cadastro.' };
   }
 }
 
 export async function processPayment(data: PaymentData): Promise<PaymentResponse> {
+  debugLog('API', `processPayment iniciado`, { data, isDevelopment });
+  
   if (isDevelopment) {
-    console.log('[DEV MODE] Simulating payment:', data);
+    debugWarn('API', `[DEV MODE] Simulando processPayment`);
     return { 
       success: true, 
       transactionId: 'dev-tx-' + Date.now(),
@@ -492,18 +585,24 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
   }
   
   try {
-    const response = await fetch(`${API_BASE_URL}/land_pagamento.asp`, {
+    const url = `${API_BASE_URL}/land_pagamento.asp`;
+    debugLog('API', `Fazendo POST para: ${url}`, data);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return response.json();
+    
+    const result = await response.json();
+    debugLog('API', `processPayment resposta:`, result);
+    return result;
   } catch (error) {
-    console.error('Error processing payment:', error);
+    debugError('API', `Erro em processPayment:`, error);
     return { success: false, message: 'Erro ao processar pagamento.' };
   }
 }
 
 export async function fetchPortfolio(): Promise<PortfolioData> {
-  return safeFetch(`${API_BASE_URL}/land_portfolio.asp`, fallbackPortfolio);
+  return safeFetch(`${API_BASE_URL}/land_portfolio.asp`, fallbackPortfolio, 'fetchPortfolio');
 }
