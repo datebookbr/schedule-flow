@@ -422,6 +422,12 @@ const fallbackPortfolio: PortfolioData = {
 
 // ============= API FUNCTIONS WITH FALLBACK =============
 
+// Interface for wrapped API responses
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+}
+
 async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<T> {
   debugLog('API', `Iniciando fetch: ${apiName}`, { url, isDevelopment });
   
@@ -465,9 +471,16 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
     }
     
     try {
-      const parsed = JSON.parse(text) as T;
+      const parsed = JSON.parse(text);
       debugLog('API', `${apiName} parseado com sucesso!`, parsed);
-      return parsed;
+      
+      // Check if response is wrapped in {success, data} format
+      if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
+        debugLog('API', `${apiName} - Extraindo .data do response wrapper`, parsed.data);
+        return parsed.data as T;
+      }
+      
+      return parsed as T;
     } catch (parseError) {
       debugError('API', `Erro ao parsear JSON de ${apiName}:`, {
         error: parseError,
