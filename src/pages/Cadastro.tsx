@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { 
   fetchPlanById, 
   fetchSiteConfig, 
   registerCustomer,
@@ -13,6 +20,16 @@ import {
   type CustomerData 
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import {
+  maskPhone,
+  maskCpfCnpj,
+  maskCEP,
+  detectDocumentType,
+  isValidEmail,
+  isValidCpfCnpj,
+  isValidPhone,
+  ESTADOS_BR
+} from '@/hooks/use-input-masks';
 
 export default function Cadastro() {
   const [searchParams] = useSearchParams();
@@ -24,6 +41,7 @@ export default function Cadastro() {
   const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null);
   const [plan, setPlan] = useState<PricingPlan | null>(null);
   const [loading, setLoading] = useState(false);
+  const [clientType, setClientType] = useState<'pf' | 'pj'>('pf');
   
   const [formData, setFormData] = useState<CustomerData>({
     name: '',
@@ -49,16 +67,70 @@ export default function Cadastro() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    let maskedValue = value;
+    
+    // Aplica máscaras baseado no campo
+    switch (name) {
+      case 'phone':
+        maskedValue = maskPhone(value);
+        break;
+      case 'cpfCnpj':
+        maskedValue = maskCpfCnpj(value);
+        setClientType(detectDocumentType(maskedValue));
+        break;
+      case 'zipCode':
+        maskedValue = maskCEP(value);
+        break;
+      default:
+        maskedValue = value;
+    }
+    
+    setFormData(prev => ({ ...prev, [name]: maskedValue }));
+  };
+  
+  const handleStateChange = (value: string) => {
+    setFormData(prev => ({ ...prev, state: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validação de campos obrigatórios
     if (!formData.name || !formData.email || !formData.phone || !formData.cpfCnpj) {
       toast({
         title: 'Campos obrigatórios',
         description: 'Por favor, preencha todos os campos obrigatórios.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Validação de email
+    if (!isValidEmail(formData.email)) {
+      toast({
+        title: 'E-mail inválido',
+        description: 'Por favor, insira um e-mail válido.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Validação de telefone
+    if (!isValidPhone(formData.phone)) {
+      toast({
+        title: 'Telefone inválido',
+        description: 'Por favor, insira um telefone válido com DDD.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    // Validação de CPF/CNPJ
+    if (!isValidCpfCnpj(formData.cpfCnpj)) {
+      toast({
+        title: clientType === 'pf' ? 'CPF inválido' : 'CNPJ inválido',
+        description: `Por favor, insira um ${clientType === 'pf' ? 'CPF' : 'CNPJ'} válido.`,
         variant: 'destructive'
       });
       return;
@@ -194,13 +266,18 @@ export default function Cadastro() {
                         />
                       </div>
                       <div className="sm:col-span-2">
-                        <Label htmlFor="cpfCnpj">CPF ou CNPJ *</Label>
+                        <Label htmlFor="cpfCnpj">
+                          {clientType === 'pf' ? 'CPF' : 'CNPJ'} * 
+                          <span className="ml-2 text-xs text-muted-foreground font-normal">
+                            ({clientType === 'pf' ? 'Pessoa Física' : 'Pessoa Jurídica'})
+                          </span>
+                        </Label>
                         <Input
                           id="cpfCnpj"
                           name="cpfCnpj"
                           value={formData.cpfCnpj}
                           onChange={handleInputChange}
-                          placeholder="000.000.000-00 ou 00.000.000/0001-00"
+                          placeholder={clientType === 'pf' ? '000.000.000-00' : '00.000.000/0001-00'}
                           required
                         />
                       </div>
@@ -247,14 +324,18 @@ export default function Cadastro() {
                       </div>
                       <div>
                         <Label htmlFor="state">Estado</Label>
-                        <Input
-                          id="state"
-                          name="state"
-                          value={formData.state}
-                          onChange={handleInputChange}
-                          placeholder="UF"
-                          maxLength={2}
-                        />
+                        <Select value={formData.state} onValueChange={handleStateChange}>
+                          <SelectTrigger id="state" className="bg-background">
+                            <SelectValue placeholder="Selecione o estado" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border border-border">
+                            {ESTADOS_BR.map((uf) => (
+                              <SelectItem key={uf} value={uf}>
+                                {uf}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor="zipCode">CEP</Label>
