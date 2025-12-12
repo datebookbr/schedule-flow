@@ -29,6 +29,7 @@ export default function Pagamento() {
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
   const [pixCode, setPixCode] = useState<string>('');
+  const [pixQrCode, setPixQrCode] = useState<string>('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   
   const [cardData, setCardData] = useState({
@@ -67,6 +68,9 @@ export default function Pagamento() {
       
       if (result.success && result.pixCode) {
         setPixCode(result.pixCode);
+        if (result.pixQrCode) {
+          setPixQrCode(result.pixQrCode);
+        }
         toast({
           title: 'PIX gerado!',
           description: 'Copie o código ou escaneie o QR Code para pagar.'
@@ -298,9 +302,17 @@ export default function Pagamento() {
                           </div>
                         </div>
                         <div className="text-center p-6 bg-background rounded-xl border border-border">
-                          <div className="w-48 h-48 bg-muted rounded-xl mx-auto mb-4 flex items-center justify-center">
-                            <QrCode className="w-24 h-24 text-muted-foreground" />
-                          </div>
+                          {pixQrCode ? (
+                            <img 
+                              src={pixQrCode} 
+                              alt="QR Code PIX" 
+                              className="w-48 h-48 mx-auto mb-4 rounded-xl"
+                            />
+                          ) : (
+                            <div className="w-48 h-48 bg-muted rounded-xl mx-auto mb-4 flex items-center justify-center">
+                              <QrCode className="w-24 h-24 text-muted-foreground" />
+                            </div>
+                          )}
                           <p className="text-sm text-muted-foreground">
                             Escaneie o QR Code com o app do seu banco
                           </p>

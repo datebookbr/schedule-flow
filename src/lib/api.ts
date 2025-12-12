@@ -657,6 +657,8 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
     return { 
       success: true, 
       transactionId: 'dev-tx-' + Date.now(),
+      pixCode: '00020126580014br.gov.bcb.pix0136dev-test-pix-code',
+      pixQrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
       message: 'Pagamento simulado com sucesso!'
     };
   }
@@ -673,6 +675,18 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
     
     const result = await response.json();
     debugLog('API', `processPayment resposta:`, result);
+    
+    // Extract data from wrapped response {success, data} structure
+    if (result.success && result.data) {
+      return {
+        success: true,
+        transactionId: String(result.data.pagamento_id || ''),
+        pixCode: result.data.pix_code || '',
+        pixQrCode: result.data.pix_qrcode || '',
+        message: result.message || 'Pagamento processado com sucesso!'
+      };
+    }
+    
     return result;
   } catch (error) {
     debugError('API', `Erro em processPayment:`, error);
