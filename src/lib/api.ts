@@ -592,7 +592,30 @@ export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
     
     const parsed = JSON.parse(text);
     debugLog('API', `fetchPlanById parseado com sucesso:`, parsed);
-    return parsed;
+    
+    // Extract data from {success, data} wrapper if present
+    let planData = parsed;
+    if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
+      debugLog('API', `fetchPlanById - Extraindo .data do response wrapper`);
+      planData = parsed.data;
+    }
+    
+    // Normalize fields and ensure features is always an array
+    const normalizedPlan: PricingPlan = {
+      id: String(planData.id || id),
+      name: String(planData.name || ''),
+      price: typeof planData.price === 'number' ? `R$ ${planData.price.toFixed(2).replace('.', ',')}` : String(planData.price || ''),
+      priceValue: typeof planData.price === 'number' ? planData.price : parseFloat(String(planData.price || '0').replace(/[^\d.,]/g, '').replace(',', '.')),
+      period: planData.period ? `/${planData.period}` : '/mês',
+      description: String(planData.description || ''),
+      professionals: String(planData.professionals || ''),
+      features: Array.isArray(planData.features) ? planData.features.map((f: unknown) => String(f || '')) : [],
+      highlighted: Boolean(planData.popular || planData.highlighted),
+      cta: String(planData.cta || 'Contratar')
+    };
+    
+    debugLog('API', `fetchPlanById normalizado:`, normalizedPlan);
+    return normalizedPlan;
   } catch (error) {
     debugError('API', `Erro em fetchPlanById:`, { id, error });
     return fallbackPricing.find(p => p.id === id) || null;
