@@ -1,20 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Check, CreditCard, QrCode, Copy, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Check, CreditCard, QrCode, Copy, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
   fetchPlanById, 
   fetchSiteConfig, 
-  processPayment,
+  createAsaasCustomer,
+  createAsaasPayment,
+  getAsaasPaymentStatus,
   type PricingPlan, 
-  type SiteConfig,
-  type PaymentData 
+  type SiteConfig 
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 type PaymentMethod = 'credit_card' | 'pix';
+
+// Máscaras para campos de cartão
+const maskCardNumber = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 16);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+};
+
+const maskCardExpiry = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  if (digits.length >= 2) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  }
+  return digits;
+};
+
+const maskCVV = (value: string): string => {
+  return value.replace(/\D/g, '').slice(0, 4);
+};
 
 export default function Pagamento() {
   const [searchParams] = useSearchParams();
@@ -22,7 +41,16 @@ export default function Pagamento() {
   const { toast } = useToast();
   
   const planId = searchParams.get('plano') || '1';
-  const customerId = searchParams.get('cliente') || '';
+  const customerIdParam = searchParams.get('cliente') || '';
+  const customerName = searchParams.get('nome') || '';
+  const customerEmail = searchParams.get('email') || '';
+  const customerCpfCnpj = searchParams.get('cpfCnpj') || '';
+  const customerPhone = searchParams.get('telefone') || '';
+  const customerAddress = searchParams.get('endereco') || '';
+  const customerAddressNumber = searchParams.get('numero') || '';
+  const customerPostalCode = searchParams.get('cep') || '';
+  const customerCity = searchParams.get('cidade') || '';
+  const customerState = searchParams.get('estado') || '';
   
   const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null);
   const [plan, setPlan] = useState<PricingPlan | null>(null);
@@ -30,7 +58,10 @@ export default function Pagamento() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
   const [pixCode, setPixCode] = useState<string>('');
   const [pixQrCode, setPixQrCode] = useState<string>('');
+  const [paymentId, setPaymentId] = useState<string>('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [asaasCustomerId, setAsaasCustomerId] = useState<string>('');
+  const [checkingPayment, setCheckingPayment] = useState(false);
   
   const [cardData, setCardData] = useState({
     cardNumber: '',
@@ -51,29 +82,113 @@ export default function Pagamento() {
 
   const handleCardInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setCardData(prev => ({ ...prev, [name]: value }));
+    let maskedValue = value;
+    
+    if (name === 'cardNumber') {
+      maskedValue = maskCardNumber(value);
+    } else if (name === 'cardExpiry') {
+      maskedValue = maskCardExpiry(value);
+    } else if (name === 'cardCvv') {
+      maskedValue = maskCVV(value);
+    }
+    
+    setCardData(prev => ({ ...prev, [name]: maskedValue }));
   };
+
+  // Criar cliente no Asaas
+  const ensureAsaasCustomer = async (): Promise<string | null> => {
+    if (asaasCustomerId) return asaasCustomerId;
+    
+    const customerResult = await createAsaasCustomer({
+      name: customerName,
+      email: customerEmail,
+      cpfCnpj: customerCpfCnpj,
+      phone: customerPhone,
+      address: customerAddress,
+      addressNumber: customerAddressNumber,
+      postalCode: customerPostalCode,
+      city: customerCity,
+      state: customerState,
+    });
+    
+    if (customerResult.success && customerResult.customerId) {
+      setAsaasCustomerId(customerResult.customerId);
+      return customerResult.customerId;
+    }
+    
+    toast({
+      title: 'Erro',
+      description: customerResult.error || 'Não foi possível criar o cliente.',
+      variant: 'destructive'
+    });
+    return null;
+  };
+
+  // Verificar status do pagamento PIX
+  const checkPaymentStatus = useCallback(async () => {
+    if (!paymentId || paymentSuccess) return;
+    
+    setCheckingPayment(true);
+    const result = await getAsaasPaymentStatus(paymentId);
+    setCheckingPayment(false);
+    
+    if (result.success && (result.status === 'CONFIRMED' || result.status === 'RECEIVED')) {
+      setPaymentSuccess(true);
+      toast({
+        title: 'Pagamento confirmado!',
+        description: 'Seu pagamento foi processado com sucesso.'
+      });
+    }
+  }, [paymentId, paymentSuccess, toast]);
+
+  // Polling para verificar status do PIX
+  useEffect(() => {
+    if (!paymentId || paymentSuccess) return;
+    
+    const interval = setInterval(checkPaymentStatus, 5000); // Verificar a cada 5 segundos
+    return () => clearInterval(interval);
+  }, [paymentId, paymentSuccess, checkPaymentStatus]);
 
   const handleGeneratePix = async () => {
     setLoading(true);
     
     try {
-      const paymentData: PaymentData = {
-        planId,
+      const customerId = await ensureAsaasCustomer();
+      if (!customerId) {
+        setLoading(false);
+        return;
+      }
+      
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 1);
+      
+      const result = await createAsaasPayment({
         customerId,
-        paymentMethod: 'pix'
-      };
+        billingType: 'PIX',
+        value: plan?.priceValue || 49.90,
+        dueDate: dueDate.toISOString().split('T')[0],
+        description: `Assinatura ${plan?.name || 'Datebook'}`
+      });
       
-      const result = await processPayment(paymentData);
-      
-      if (result.success && result.pixCode) {
-        setPixCode(result.pixCode);
-        if (result.pixQrCode) {
-          setPixQrCode(result.pixQrCode);
+      if (result.success && result.paymentId) {
+        setPaymentId(result.paymentId);
+        
+        if (result.pixData) {
+          setPixCode(result.pixData.payload || '');
+          if (result.pixData.encodedImage) {
+            setPixQrCode(`data:image/png;base64,${result.pixData.encodedImage}`);
+          }
         }
+        
         toast({
           title: 'PIX gerado!',
           description: 'Copie o código ou escaneie o QR Code para pagar.'
+        });
+      } else {
+        toast({
+          title: 'Erro',
+          description: result.error || 'Não foi possível gerar o código PIX.',
+          variant: 'destructive'
         });
       }
     } catch (error) {
@@ -102,25 +217,51 @@ export default function Pagamento() {
     setLoading(true);
     
     try {
-      const paymentData: PaymentData = {
-        planId,
+      const customerId = await ensureAsaasCustomer();
+      if (!customerId) {
+        setLoading(false);
+        return;
+      }
+      
+      const [expiryMonth, expiryYear] = cardData.cardExpiry.split('/');
+      const fullYear = expiryYear.length === 2 ? `20${expiryYear}` : expiryYear;
+      
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 1);
+      
+      const result = await createAsaasPayment({
         customerId,
-        paymentMethod: 'credit_card',
-        ...cardData
-      };
+        billingType: 'CREDIT_CARD',
+        value: plan?.priceValue || 49.90,
+        dueDate: dueDate.toISOString().split('T')[0],
+        description: `Assinatura ${plan?.name || 'Datebook'}`,
+        creditCard: {
+          holderName: cardData.cardName,
+          number: cardData.cardNumber.replace(/\s/g, ''),
+          expiryMonth,
+          expiryYear: fullYear,
+          ccv: cardData.cardCvv
+        },
+        creditCardHolderInfo: {
+          name: customerName,
+          email: customerEmail,
+          cpfCnpj: customerCpfCnpj,
+          postalCode: customerPostalCode,
+          addressNumber: customerAddressNumber,
+          phone: customerPhone
+        }
+      });
       
-      const result = await processPayment(paymentData);
-      
-      if (result.success) {
+      if (result.success && (result.status === 'CONFIRMED' || result.status === 'PENDING')) {
         setPaymentSuccess(true);
         toast({
           title: 'Pagamento aprovado!',
-          description: result.message
+          description: 'Seu pagamento foi processado com sucesso.'
         });
       } else {
         toast({
           title: 'Pagamento não aprovado',
-          description: result.message || 'Verifique os dados do cartão.',
+          description: result.error || 'Verifique os dados do cartão.',
           variant: 'destructive'
         });
       }
@@ -317,8 +458,14 @@ export default function Pagamento() {
                             Escaneie o QR Code com o app do seu banco
                           </p>
                         </div>
+                        {checkingPayment && (
+                          <div className="flex items-center justify-center gap-2 text-sm text-primary">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Verificando pagamento...
+                          </div>
+                        )}
                         <p className="text-sm text-center text-muted-foreground">
-                          Após o pagamento, você receberá a confirmação por e-mail em até 5 minutos.
+                          O status do pagamento será atualizado automaticamente.
                         </p>
                       </div>
                     )}
