@@ -649,6 +649,109 @@ export async function registerCustomer(data: CustomerData): Promise<{ success: b
   }
 }
 
+// Função para chamar a edge function do Asaas
+async function callAsaasApi(action: string, data: Record<string, unknown>): Promise<unknown> {
+  const SUPABASE_URL = 'https://elhjmzuxcyyofvbtfdwt.supabase.co';
+  const url = `${SUPABASE_URL}/functions/v1/asaas-payment`;
+  
+  debugLog('API', `[ASAAS] Chamando ${action}`, data);
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...data })
+  });
+  
+  const result = await response.json();
+  debugLog('API', `[ASAAS] Resposta ${action}:`, result);
+  return result;
+}
+
+export async function createAsaasCustomer(customerData: {
+  name: string;
+  email: string;
+  cpfCnpj: string;
+  phone?: string;
+  address?: string;
+  addressNumber?: string;
+  postalCode?: string;
+  city?: string;
+  state?: string;
+}): Promise<{ success: boolean; customerId?: string; error?: string }> {
+  try {
+    const result = await callAsaasApi('create_customer', customerData) as { success: boolean; customerId?: string; error?: string };
+    return result;
+  } catch (error) {
+    debugError('API', `Erro ao criar cliente Asaas:`, error);
+    return { success: false, error: 'Erro ao criar cliente.' };
+  }
+}
+
+export async function createAsaasPayment(paymentData: {
+  customerId: string;
+  billingType: 'PIX' | 'CREDIT_CARD';
+  value: number;
+  dueDate: string;
+  description?: string;
+  creditCard?: {
+    holderName: string;
+    number: string;
+    expiryMonth: string;
+    expiryYear: string;
+    ccv: string;
+  };
+  creditCardHolderInfo?: {
+    name: string;
+    email: string;
+    cpfCnpj: string;
+    postalCode: string;
+    addressNumber: string;
+    phone: string;
+  };
+}): Promise<{
+  success: boolean;
+  paymentId?: string;
+  status?: string;
+  invoiceUrl?: string;
+  pixData?: { encodedImage?: string; payload?: string; expirationDate?: string };
+  error?: string;
+}> {
+  try {
+    const result = await callAsaasApi('create_payment', paymentData) as {
+      success: boolean;
+      paymentId?: string;
+      status?: string;
+      invoiceUrl?: string;
+      pixData?: { encodedImage?: string; payload?: string; expirationDate?: string };
+      error?: string;
+    };
+    return result;
+  } catch (error) {
+    debugError('API', `Erro ao criar pagamento Asaas:`, error);
+    return { success: false, error: 'Erro ao criar pagamento.' };
+  }
+}
+
+export async function getAsaasPaymentStatus(paymentId: string): Promise<{
+  success: boolean;
+  status?: string;
+  confirmedDate?: string;
+  error?: string;
+}> {
+  try {
+    const result = await callAsaasApi('get_payment_status', { paymentId }) as {
+      success: boolean;
+      status?: string;
+      confirmedDate?: string;
+      error?: string;
+    };
+    return result;
+  } catch (error) {
+    debugError('API', `Erro ao verificar status Asaas:`, error);
+    return { success: false, error: 'Erro ao verificar status.' };
+  }
+}
+
 export async function processPayment(data: PaymentData): Promise<PaymentResponse> {
   debugLog('API', `processPayment iniciado`, { data, isDevelopment });
   
