@@ -649,41 +649,60 @@ export async function registerCustomer(data: CustomerData): Promise<{ success: b
   }
 }
 
-// Função para chamar a edge function do Asaas
-async function callAsaasApi(action: string, data: Record<string, unknown>): Promise<unknown> {
-  const SUPABASE_URL = 'https://elhjmzuxcyyofvbtfdwt.supabase.co';
-  const url = `${SUPABASE_URL}/functions/v1/asaas-payment`;
-  
-  debugLog('API', `[ASAAS] Chamando ${action}`, data);
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...data })
-  });
-  
-  const result = await response.json();
-  debugLog('API', `[ASAAS] Resposta ${action}:`, result);
-  return result;
-}
+// ============= ASAAS PAYMENT API (via ASP Classic) =============
 
-export async function createAsaasCustomer(customerData: {
+export async function createAsaasCustomer(formData: {
   name: string;
   email: string;
   cpfCnpj: string;
   phone?: string;
+  company?: string;
   address?: string;
-  addressNumber?: string;
-  postalCode?: string;
   city?: string;
   state?: string;
-}): Promise<{ success: boolean; customerId?: string; error?: string }> {
+  zipCode?: string;
+  planId?: string;
+}): Promise<{ success: boolean; customerId?: string; asaas_ready?: boolean; error?: string }> {
+  debugLog('API', `[ASAAS] createAsaasCustomer iniciado`, formData);
+  
+  if (isDevelopment) {
+    debugWarn('API', `[DEV MODE] Simulando createAsaasCustomer`);
+    return { success: true, customerId: 'dev-cus-' + Date.now(), asaas_ready: true };
+  }
+  
   try {
-    const result = await callAsaasApi('create_customer', customerData) as { success: boolean; customerId?: string; error?: string };
-    return result;
+    const url = `${API_BASE_URL}/land_cadastro.asp`;
+    debugLog('API', `[ASAAS] Fazendo POST para: ${url}`);
+    
+    const body = new FormData();
+    body.append('name', formData.name);
+    body.append('email', formData.email);
+    body.append('cpfCnpj', formData.cpfCnpj);
+    if (formData.phone) body.append('phone', formData.phone);
+    if (formData.company) body.append('company', formData.company);
+    if (formData.address) body.append('address', formData.address);
+    if (formData.city) body.append('city', formData.city);
+    if (formData.state) body.append('state', formData.state);
+    if (formData.zipCode) body.append('zipCode', formData.zipCode);
+    if (formData.planId) body.append('planId', formData.planId);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      body: body
+    });
+    
+    const result = await response.json();
+    debugLog('API', `[ASAAS] createAsaasCustomer resposta:`, result);
+    
+    return {
+      success: result.success === true,
+      customerId: result.customerId,
+      asaas_ready: result.asaas_ready === true,
+      error: result.error || result.message
+    };
   } catch (error) {
-    debugError('API', `Erro ao criar cliente Asaas:`, error);
-    return { success: false, error: 'Erro ao criar cliente.' };
+    debugError('API', `[ASAAS] Erro ao criar cliente:`, error);
+    return { success: false, error: 'Erro ao processar cadastro.' };
   }
 }
 
@@ -691,7 +710,7 @@ export async function createAsaasPayment(paymentData: {
   customerId: string;
   billingType: 'PIX' | 'CREDIT_CARD';
   value: number;
-  dueDate: string;
+  dueDate?: string;
   description?: string;
   creditCard?: {
     holderName: string;
@@ -713,22 +732,75 @@ export async function createAsaasPayment(paymentData: {
   paymentId?: string;
   status?: string;
   invoiceUrl?: string;
-  pixData?: { encodedImage?: string; payload?: string; expirationDate?: string };
+  pixData?: { imageDataUrl?: string; encodedImage?: string; payload?: string; expirationDate?: string };
   error?: string;
 }> {
+  debugLog('API', `[ASAAS] createAsaasPayment iniciado`, paymentData);
+  
+  if (isDevelopment) {
+    debugWarn('API', `[DEV MODE] Simulando createAsaasPayment`);
+    if (paymentData.billingType === 'PIX') {
+      return { 
+        success: true, 
+        paymentId: 'dev-pay-' + Date.now(),
+        status: 'PENDING',
+        pixData: { 
+          imageDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          payload: 'dev-pix-payload-' + Date.now()
+        }
+      };
+    }
+    return { success: true, paymentId: 'dev-pay-' + Date.now(), status: 'CONFIRMED' };
+  }
+  
   try {
-    const result = await callAsaasApi('create_payment', paymentData) as {
-      success: boolean;
-      paymentId?: string;
-      status?: string;
-      invoiceUrl?: string;
-      pixData?: { encodedImage?: string; payload?: string; expirationDate?: string };
-      error?: string;
+    const url = `${API_BASE_URL}/asaas.asp`;
+    debugLog('API', `[ASAAS] Fazendo POST para: ${url}`);
+    
+    const body = new FormData();
+    body.append('customerId', paymentData.customerId);
+    body.append('billingType', paymentData.billingType);
+    body.append('value', paymentData.value.toString());
+    if (paymentData.dueDate) body.append('dueDate', paymentData.dueDate);
+    if (paymentData.description) body.append('description', paymentData.description);
+    
+    // Adicionar dados do cartão se for CREDIT_CARD
+    if (paymentData.billingType === 'CREDIT_CARD' && paymentData.creditCard) {
+      body.append('cardHolderName', paymentData.creditCard.holderName);
+      body.append('cardNumber', paymentData.creditCard.number);
+      body.append('cardExpiryMonth', paymentData.creditCard.expiryMonth);
+      body.append('cardExpiryYear', paymentData.creditCard.expiryYear);
+      body.append('cardCcv', paymentData.creditCard.ccv);
+      
+      if (paymentData.creditCardHolderInfo) {
+        body.append('holderName', paymentData.creditCardHolderInfo.name);
+        body.append('holderEmail', paymentData.creditCardHolderInfo.email);
+        body.append('holderCpfCnpj', paymentData.creditCardHolderInfo.cpfCnpj);
+        body.append('holderPostalCode', paymentData.creditCardHolderInfo.postalCode);
+        body.append('holderAddressNumber', paymentData.creditCardHolderInfo.addressNumber);
+        body.append('holderPhone', paymentData.creditCardHolderInfo.phone);
+      }
+    }
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      body: body
+    });
+    
+    const result = await response.json();
+    debugLog('API', `[ASAAS] createAsaasPayment resposta:`, result);
+    
+    return {
+      success: result.success === true,
+      paymentId: result.paymentId,
+      status: result.status,
+      invoiceUrl: result.invoiceUrl,
+      pixData: result.pixData,
+      error: result.error || result.message
     };
-    return result;
   } catch (error) {
-    debugError('API', `Erro ao criar pagamento Asaas:`, error);
-    return { success: false, error: 'Erro ao criar pagamento.' };
+    debugError('API', `[ASAAS] Erro ao criar pagamento:`, error);
+    return { success: false, error: 'Erro ao processar pagamento.' };
   }
 }
 
@@ -738,16 +810,29 @@ export async function getAsaasPaymentStatus(paymentId: string): Promise<{
   confirmedDate?: string;
   error?: string;
 }> {
+  debugLog('API', `[ASAAS] getAsaasPaymentStatus iniciado`, { paymentId });
+  
+  if (isDevelopment) {
+    debugWarn('API', `[DEV MODE] Simulando getAsaasPaymentStatus`);
+    return { success: true, status: 'PENDING' };
+  }
+  
   try {
-    const result = await callAsaasApi('get_payment_status', { paymentId }) as {
-      success: boolean;
-      status?: string;
-      confirmedDate?: string;
-      error?: string;
+    const url = `${API_BASE_URL}/asaas.asp?action=status&paymentId=${encodeURIComponent(paymentId)}`;
+    debugLog('API', `[ASAAS] Fazendo GET para: ${url}`);
+    
+    const response = await fetch(url);
+    const result = await response.json();
+    debugLog('API', `[ASAAS] getAsaasPaymentStatus resposta:`, result);
+    
+    return {
+      success: result.success === true,
+      status: result.status,
+      confirmedDate: result.confirmedDate,
+      error: result.error || result.message
     };
-    return result;
   } catch (error) {
-    debugError('API', `Erro ao verificar status Asaas:`, error);
+    debugError('API', `[ASAAS] Erro ao verificar status:`, error);
     return { success: false, error: 'Erro ao verificar status.' };
   }
 }
