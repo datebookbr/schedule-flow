@@ -104,9 +104,8 @@ export default function Pagamento() {
       email: customerEmail,
       cpfCnpj: customerCpfCnpj,
       phone: customerPhone,
-      address: customerAddress,
-      addressNumber: customerAddressNumber,
-      postalCode: customerPostalCode,
+      address: customerAddress + (customerAddressNumber ? ', ' + customerAddressNumber : ''),
+      zipCode: customerPostalCode,
       city: customerCity,
       state: customerState,
     });
