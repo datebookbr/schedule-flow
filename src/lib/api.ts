@@ -35,24 +35,20 @@ debugLog('ENV', `isDevelopment: ${isDevelopment}`);
 debugLog('ENV', `API_BASE_URL: ${API_BASE_URL}`);
 
 // Helper function to extract text from fields that might be objects like {text, included}
-// This normalizes API responses that return structured text objects instead of plain strings
 function normalizeTextField(value: unknown): unknown {
   if (value === null || value === undefined) {
     return value;
   }
   
-  // If it's an object with 'text' property, extract the text
   if (typeof value === 'object' && value !== null && 'text' in value) {
     const obj = value as { text: string; included?: boolean };
     return obj.text;
   }
   
-  // If it's an array, normalize each element
   if (Array.isArray(value)) {
     return value.map(item => normalizeTextField(item));
   }
   
-  // If it's an object (but not with 'text'), recursively normalize all properties
   if (typeof value === 'object') {
     const normalized: Record<string, unknown> = {};
     for (const key in value) {
@@ -61,7 +57,6 @@ function normalizeTextField(value: unknown): unknown {
     return normalized;
   }
   
-  // For primitives (strings, numbers, booleans), return as-is
   return value;
 }
 
@@ -193,17 +188,40 @@ export interface PricingPlan {
   cta: string;
 }
 
-// Customer Registration Interface
+// Customer Registration Interface - Updated with all fields from API
 export interface CustomerData {
-  name: string;
+  nome: string;
   email: string;
-  phone: string;
+  whatsapp: string;
   cpfCnpj: string;
-  company?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
+  tipoPessoa: 'PF' | 'PJ';
+  companhia?: string;
+  rua?: string;
+  numero?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+  cep?: string;
+  descricao?: string;
+  slug: string;
+}
+
+// Slug Config Response from GET /api/land_cadastro.asp?slug=xxx
+export interface SlugConfig {
+  success: boolean;
+  valor?: number;
+  destinatario?: string;
+  redirect?: string;
+  descricaoProduto?: string;
+}
+
+// Customer Registration Response
+export interface CustomerResponse {
+  success: boolean;
+  customerId?: string;
+  asaasCustomerId?: string;
+  message?: string;
+  error?: string;
 }
 
 // Payment Data Interface
@@ -247,7 +265,6 @@ export interface PortfolioData {
 }
 
 // ============= FALLBACK DATA FOR DEVELOPMENT =============
-// These are used when APIs are not available (Lovable preview environment)
 
 const fallbackSiteConfig: SiteConfig = {
   name: "Datebook",
@@ -455,12 +472,6 @@ const fallbackPortfolio: PortfolioData = {
 
 // ============= API FUNCTIONS WITH FALLBACK =============
 
-// Interface for wrapped API responses
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-}
-
 async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<T> {
   debugLog('API', `Iniciando fetch: ${apiName}`, { url, isDevelopment });
   
@@ -487,7 +498,6 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
     
     debugLog('API', `Conteúdo raw de ${apiName} (primeiros 200 chars):`, text.substring(0, 200));
     
-    // Check if response is HTML (error page) instead of JSON
     if (text.startsWith('<!') || text.startsWith('<html') || text.startsWith('<HTML')) {
       debugError('API', `${apiName} retornou HTML ao invés de JSON!`, {
         url,
@@ -497,7 +507,6 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
       return fallback;
     }
     
-    // Check for empty response
     if (!text || text.trim() === '') {
       debugError('API', `${apiName} retornou resposta vazia!`, { url });
       return fallback;
@@ -509,7 +518,6 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
       
       let result: unknown;
       
-      // Check if response is wrapped in {success, data} format
       if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
         debugLog('API', `${apiName} - Extraindo .data do response wrapper`, parsed.data);
         result = parsed.data;
@@ -517,7 +525,6 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
         result = parsed;
       }
       
-      // Normalize fields that might be {text, included} objects
       const normalized = normalizeTextField(result);
       debugLog('API', `${apiName} - Dados normalizados`, normalized);
       
@@ -593,14 +600,12 @@ export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
     const parsed = JSON.parse(text);
     debugLog('API', `fetchPlanById parseado com sucesso:`, parsed);
     
-    // Extract data from {success, data} wrapper if present
     let planData = parsed;
     if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
       debugLog('API', `fetchPlanById - Extraindo .data do response wrapper`);
       planData = parsed.data;
     }
     
-    // Normalize fields and ensure features is always an array
     const normalizedPlan: PricingPlan = {
       id: String(planData.id || id),
       name: String(planData.name || ''),
@@ -622,17 +627,55 @@ export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
   }
 }
 
-export async function registerCustomer(data: CustomerData): Promise<{ success: boolean; customerId?: string; message?: string }> {
-  debugLog('API', `registerCustomer iniciado`, { data, isDevelopment });
+// ============= SLUG CONFIG (GET) =============
+// GET /api/land_cadastro.asp?slug=xxx
+export async function fetchSlugConfig(slug: string): Promise<SlugConfig> {
+  debugLog('API', `[SLUG] fetchSlugConfig iniciado`, { slug, isDevelopment });
+  
+  if (isDevelopment) {
+    debugWarn('API', `[DEV MODE] Simulando fetchSlugConfig`);
+    return { 
+      success: true, 
+      valor: 49.90, 
+      destinatario: 'Datebook', 
+      redirect: 'https://datebook.com.br/sucesso',
+      descricaoProduto: 'Assinatura Datebook'
+    };
+  }
+  
+  try {
+    const url = `${API_BASE_URL}/land_cadastro.asp?slug=${encodeURIComponent(slug)}`;
+    debugLog('API', `[SLUG] Fazendo GET para: ${url}`);
+    
+    const response = await fetch(url);
+    const result = await response.json();
+    debugLog('API', `[SLUG] fetchSlugConfig resposta:`, result);
+    
+    return result;
+  } catch (error) {
+    debugError('API', `[SLUG] Erro ao buscar config do slug:`, error);
+    return { success: false };
+  }
+}
+
+// ============= CUSTOMER REGISTRATION (POST) =============
+// POST /api/land_cadastro.asp with JSON body
+export async function registerCustomer(data: CustomerData): Promise<CustomerResponse> {
+  debugLog('API', `[CADASTRO] registerCustomer iniciado`, { data, isDevelopment });
   
   if (isDevelopment) {
     debugWarn('API', `[DEV MODE] Simulando registerCustomer`);
-    return { success: true, customerId: 'dev-' + Date.now(), message: 'Cadastro simulado com sucesso!' };
+    return { 
+      success: true, 
+      customerId: 'dev-' + Date.now(), 
+      asaasCustomerId: 'cus_dev_' + Date.now(),
+      message: 'Cliente cadastrado com sucesso' 
+    };
   }
   
   try {
     const url = `${API_BASE_URL}/land_cadastro.asp`;
-    debugLog('API', `Fazendo POST para: ${url}`, data);
+    debugLog('API', `[CADASTRO] Fazendo POST para: ${url}`, data);
     
     const response = await fetch(url, {
       method: 'POST',
@@ -641,15 +684,126 @@ export async function registerCustomer(data: CustomerData): Promise<{ success: b
     });
     
     const result = await response.json();
-    debugLog('API', `registerCustomer resposta:`, result);
-    return result;
+    debugLog('API', `[CADASTRO] registerCustomer resposta:`, result);
+    
+    return {
+      success: result.success === true,
+      customerId: result.customerId,
+      asaasCustomerId: result.asaasCustomerId,
+      message: result.message,
+      error: result.error
+    };
   } catch (error) {
-    debugError('API', `Erro em registerCustomer:`, error);
-    return { success: false, message: 'Erro ao processar cadastro.' };
+    debugError('API', `[CADASTRO] Erro em registerCustomer:`, error);
+    return { success: false, error: 'Erro ao processar cadastro.' };
   }
 }
 
-// ============= ASAAS PAYMENT API (via ASP Classic) =============
+// ============= PAYMENT CREATION (POST) =============
+// POST /api/land_pagamento_criar.asp
+export async function createPayment(paymentData: {
+  asaasCustomerId: string;
+  customerId: string;
+  valor: number;
+  metodo: 'PIX' | 'CARTAO';
+  slug: string;
+  cardNumero?: string;
+  cardNome?: string;
+  cardValidade?: string;
+  cardCvv?: string;
+}): Promise<{
+  success: boolean;
+  asaasPaymentId?: string;
+  status?: string;
+  pixCode?: string;
+  pixQrCode?: string;
+  message?: string;
+  error?: string;
+}> {
+  debugLog('API', `[PAGAMENTO] createPayment iniciado`, paymentData);
+  
+  if (isDevelopment) {
+    debugWarn('API', `[DEV MODE] Simulando createPayment`);
+    if (paymentData.metodo === 'PIX') {
+      return { 
+        success: true, 
+        asaasPaymentId: 'pay_dev_' + Date.now(),
+        status: 'pending',
+        pixCode: '00020126580014br.gov.bcb.pix0136dev-test-pix-code-' + Date.now(),
+        pixQrCode: 'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9QzwAEjDAGNzYAAIgRAf/1VQIoAAAAAElFTkSuQmCC'
+      };
+    }
+    return { 
+      success: true, 
+      asaasPaymentId: 'pay_dev_' + Date.now(), 
+      status: 'confirmed' 
+    };
+  }
+  
+  try {
+    const url = `${API_BASE_URL}/land_pagamento_criar.asp`;
+    debugLog('API', `[PAGAMENTO] Fazendo POST para: ${url}`);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paymentData)
+    });
+    
+    const result = await response.json();
+    debugLog('API', `[PAGAMENTO] createPayment resposta:`, result);
+    
+    return {
+      success: result.success === true,
+      asaasPaymentId: result.asaasPaymentId,
+      status: result.status,
+      pixCode: result.pixCode,
+      pixQrCode: result.pixQrCode,
+      message: result.message,
+      error: result.error
+    };
+  } catch (error) {
+    debugError('API', `[PAGAMENTO] Erro ao criar pagamento:`, error);
+    return { success: false, error: 'Erro ao processar pagamento.' };
+  }
+}
+
+// ============= PAYMENT STATUS CHECK (GET) =============
+// GET /api/land_pagamento_status.asp?transactionId=xxx
+export async function checkPaymentStatus(transactionId: string): Promise<{
+  success: boolean;
+  status?: string;
+  asaasPaymentId?: string;
+  error?: string;
+}> {
+  debugLog('API', `[STATUS] checkPaymentStatus iniciado`, { transactionId });
+  
+  if (isDevelopment) {
+    debugWarn('API', `[DEV MODE] Simulando checkPaymentStatus`);
+    return { success: true, status: 'pending' };
+  }
+  
+  try {
+    const url = `${API_BASE_URL}/land_pagamento_status.asp?transactionId=${encodeURIComponent(transactionId)}`;
+    debugLog('API', `[STATUS] Fazendo GET para: ${url}`);
+    
+    const response = await fetch(url);
+    const result = await response.json();
+    debugLog('API', `[STATUS] checkPaymentStatus resposta:`, result);
+    
+    return {
+      success: true,
+      status: result.status,
+      asaasPaymentId: result.asaasPaymentId,
+      error: result.error
+    };
+  } catch (error) {
+    debugError('API', `[STATUS] Erro ao verificar status:`, error);
+    return { success: false, error: 'Erro ao verificar status.' };
+  }
+}
+
+// ============= LEGACY FUNCTIONS (for compatibility) =============
 
 export async function createAsaasCustomer(formData: {
   name: string;
@@ -663,47 +817,8 @@ export async function createAsaasCustomer(formData: {
   zipCode?: string;
   planId?: string;
 }): Promise<{ success: boolean; customerId?: string; asaas_ready?: boolean; error?: string }> {
-  debugLog('API', `[ASAAS] createAsaasCustomer iniciado`, formData);
-  
-  if (isDevelopment) {
-    debugWarn('API', `[DEV MODE] Simulando createAsaasCustomer`);
-    return { success: true, customerId: 'dev-cus-' + Date.now(), asaas_ready: true };
-  }
-  
-  try {
-    const url = `${API_BASE_URL}/land_cadastro.asp`;
-    debugLog('API', `[ASAAS] Fazendo POST para: ${url}`);
-    
-    const body = new FormData();
-    body.append('name', formData.name);
-    body.append('email', formData.email);
-    body.append('cpfCnpj', formData.cpfCnpj);
-    if (formData.phone) body.append('phone', formData.phone);
-    if (formData.company) body.append('company', formData.company);
-    if (formData.address) body.append('address', formData.address);
-    if (formData.city) body.append('city', formData.city);
-    if (formData.state) body.append('state', formData.state);
-    if (formData.zipCode) body.append('zipCode', formData.zipCode);
-    if (formData.planId) body.append('planId', formData.planId);
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      body: body
-    });
-    
-    const result = await response.json();
-    debugLog('API', `[ASAAS] createAsaasCustomer resposta:`, result);
-    
-    return {
-      success: result.success === true,
-      customerId: result.customerId,
-      asaas_ready: result.asaas_ready === true,
-      error: result.error || result.message
-    };
-  } catch (error) {
-    debugError('API', `[ASAAS] Erro ao criar cliente:`, error);
-    return { success: false, error: 'Erro ao processar cadastro.' };
-  }
+  debugLog('API', `[LEGACY] createAsaasCustomer -> deprecated, use registerCustomer`);
+  return { success: false, error: 'Use registerCustomer instead' };
 }
 
 export async function createAsaasPayment(paymentData: {
@@ -735,73 +850,8 @@ export async function createAsaasPayment(paymentData: {
   pixData?: { imageDataUrl?: string; encodedImage?: string; payload?: string; expirationDate?: string };
   error?: string;
 }> {
-  debugLog('API', `[ASAAS] createAsaasPayment iniciado`, paymentData);
-  
-  if (isDevelopment) {
-    debugWarn('API', `[DEV MODE] Simulando createAsaasPayment`);
-    if (paymentData.billingType === 'PIX') {
-      return { 
-        success: true, 
-        paymentId: 'dev-pay-' + Date.now(),
-        status: 'PENDING',
-        pixData: { 
-          imageDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-          payload: 'dev-pix-payload-' + Date.now()
-        }
-      };
-    }
-    return { success: true, paymentId: 'dev-pay-' + Date.now(), status: 'CONFIRMED' };
-  }
-  
-  try {
-    const url = `${API_BASE_URL}/asaas.asp`;
-    debugLog('API', `[ASAAS] Fazendo POST para: ${url}`);
-    
-    const body = new FormData();
-    body.append('customerId', paymentData.customerId);
-    body.append('billingType', paymentData.billingType);
-    body.append('value', paymentData.value.toString());
-    if (paymentData.dueDate) body.append('dueDate', paymentData.dueDate);
-    if (paymentData.description) body.append('description', paymentData.description);
-    
-    // Adicionar dados do cartão se for CREDIT_CARD
-    if (paymentData.billingType === 'CREDIT_CARD' && paymentData.creditCard) {
-      body.append('cardHolderName', paymentData.creditCard.holderName);
-      body.append('cardNumber', paymentData.creditCard.number);
-      body.append('cardExpiryMonth', paymentData.creditCard.expiryMonth);
-      body.append('cardExpiryYear', paymentData.creditCard.expiryYear);
-      body.append('cardCcv', paymentData.creditCard.ccv);
-      
-      if (paymentData.creditCardHolderInfo) {
-        body.append('holderName', paymentData.creditCardHolderInfo.name);
-        body.append('holderEmail', paymentData.creditCardHolderInfo.email);
-        body.append('holderCpfCnpj', paymentData.creditCardHolderInfo.cpfCnpj);
-        body.append('holderPostalCode', paymentData.creditCardHolderInfo.postalCode);
-        body.append('holderAddressNumber', paymentData.creditCardHolderInfo.addressNumber);
-        body.append('holderPhone', paymentData.creditCardHolderInfo.phone);
-      }
-    }
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      body: body
-    });
-    
-    const result = await response.json();
-    debugLog('API', `[ASAAS] createAsaasPayment resposta:`, result);
-    
-    return {
-      success: result.success === true,
-      paymentId: result.paymentId,
-      status: result.status,
-      invoiceUrl: result.invoiceUrl,
-      pixData: result.pixData,
-      error: result.error || result.message
-    };
-  } catch (error) {
-    debugError('API', `[ASAAS] Erro ao criar pagamento:`, error);
-    return { success: false, error: 'Erro ao processar pagamento.' };
-  }
+  debugLog('API', `[LEGACY] createAsaasPayment -> deprecated, use createPayment`);
+  return { success: false, error: 'Use createPayment instead' };
 }
 
 export async function getAsaasPaymentStatus(paymentId: string): Promise<{
@@ -810,76 +860,13 @@ export async function getAsaasPaymentStatus(paymentId: string): Promise<{
   confirmedDate?: string;
   error?: string;
 }> {
-  debugLog('API', `[ASAAS] getAsaasPaymentStatus iniciado`, { paymentId });
-  
-  if (isDevelopment) {
-    debugWarn('API', `[DEV MODE] Simulando getAsaasPaymentStatus`);
-    return { success: true, status: 'PENDING' };
-  }
-  
-  try {
-    const url = `${API_BASE_URL}/asaas.asp?action=status&paymentId=${encodeURIComponent(paymentId)}`;
-    debugLog('API', `[ASAAS] Fazendo GET para: ${url}`);
-    
-    const response = await fetch(url);
-    const result = await response.json();
-    debugLog('API', `[ASAAS] getAsaasPaymentStatus resposta:`, result);
-    
-    return {
-      success: result.success === true,
-      status: result.status,
-      confirmedDate: result.confirmedDate,
-      error: result.error || result.message
-    };
-  } catch (error) {
-    debugError('API', `[ASAAS] Erro ao verificar status:`, error);
-    return { success: false, error: 'Erro ao verificar status.' };
-  }
+  debugLog('API', `[LEGACY] getAsaasPaymentStatus -> deprecated, use checkPaymentStatus`);
+  return checkPaymentStatus(paymentId);
 }
 
 export async function processPayment(data: PaymentData): Promise<PaymentResponse> {
-  debugLog('API', `processPayment iniciado`, { data, isDevelopment });
-  
-  if (isDevelopment) {
-    debugWarn('API', `[DEV MODE] Simulando processPayment`);
-    return { 
-      success: true, 
-      transactionId: 'dev-tx-' + Date.now(),
-      pixCode: '00020126580014br.gov.bcb.pix0136dev-test-pix-code',
-      pixQrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-      message: 'Pagamento simulado com sucesso!'
-    };
-  }
-  
-  try {
-    const url = `${API_BASE_URL}/land_pagamento.asp`;
-    debugLog('API', `Fazendo POST para: ${url}`, data);
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    
-    const result = await response.json();
-    debugLog('API', `processPayment resposta:`, result);
-    
-    // Extract data from wrapped response {success, data} structure
-    if (result.success && result.data) {
-      return {
-        success: true,
-        transactionId: String(result.data.pagamento_id || ''),
-        pixCode: result.data.pix_code || '',
-        pixQrCode: result.data.pix_qrcode || '',
-        message: result.message || 'Pagamento processado com sucesso!'
-      };
-    }
-    
-    return result;
-  } catch (error) {
-    debugError('API', `Erro em processPayment:`, error);
-    return { success: false, message: 'Erro ao processar pagamento.' };
-  }
+  debugLog('API', `[LEGACY] processPayment -> deprecated`);
+  return { success: false, message: 'Use createPayment instead' };
 }
 
 export async function fetchPortfolio(): Promise<PortfolioData> {

@@ -1,21 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Check, CreditCard, QrCode, Copy, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
-  fetchPlanById, 
-  fetchSiteConfig, 
-  createAsaasCustomer,
-  createAsaasPayment,
-  getAsaasPaymentStatus,
-  type PricingPlan, 
-  type SiteConfig 
+  fetchSlugConfig,
+  createPayment,
+  checkPaymentStatus,
+  type SlugConfig 
 } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
-type PaymentMethod = 'credit_card' | 'pix';
+type PaymentMethod = 'pix' | 'cartao';
 
 // Máscaras para campos de cartão
 const maskCardNumber = (value: string): string => {
@@ -35,58 +32,69 @@ const maskCVV = (value: string): string => {
   return value.replace(/\D/g, '').slice(0, 4);
 };
 
+// Payment Status Polling Constants
+const POLLING_INTERVAL = 3000; // 3 seconds
+const POLLING_TIMEOUT = 600000; // 10 minutes
+
 export default function Pagamento() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const planId = searchParams.get('plano') || '1';
-  const customerIdParam = searchParams.get('cliente') || '';
-  const customerName = searchParams.get('nome') || '';
-  const customerEmail = searchParams.get('email') || '';
-  const customerCpfCnpj = searchParams.get('cpfCnpj') || '';
-  const customerPhone = searchParams.get('telefone') || '';
-  const customerAddress = searchParams.get('endereco') || '';
-  const customerAddressNumber = searchParams.get('numero') || '';
-  const customerPostalCode = searchParams.get('cep') || '';
-  const customerCity = searchParams.get('cidade') || '';
-  const customerState = searchParams.get('estado') || '';
+  const slug = searchParams.get('slug') || 'datebook';
+  const customerId = searchParams.get('customerId') || '';
+  const asaasCustomerId = searchParams.get('asaasCustomerId') || '';
+  const valorParam = searchParams.get('valor') || '49.90';
   
-  const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null);
-  const [plan, setPlan] = useState<PricingPlan | null>(null);
+  const [slugConfig, setSlugConfig] = useState<SlugConfig | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
+  
+  // PIX State
   const [pixCode, setPixCode] = useState<string>('');
   const [pixQrCode, setPixQrCode] = useState<string>('');
-  const [paymentId, setPaymentId] = useState<string>('');
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [asaasCustomerId, setAsaasCustomerId] = useState<string>('');
+  const [asaasPaymentId, setAsaasPaymentId] = useState<string>('');
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'confirmed' | 'failed'>('idle');
   const [checkingPayment, setCheckingPayment] = useState(false);
   
+  // Redirect countdown
+  const [redirectCountdown, setRedirectCountdown] = useState(5);
+  
+  // Polling refs
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingStartRef = useRef<number>(0);
+  
+  // Card data
   const [cardData, setCardData] = useState({
-    cardNumber: '',
-    cardName: '',
-    cardExpiry: '',
+    cardNumero: '',
+    cardNome: '',
+    cardValidade: '',
     cardCvv: ''
   });
 
-  useEffect(() => {
-    Promise.all([
-      fetchSiteConfig(),
-      fetchPlanById(planId)
-    ]).then(([config, planData]) => {
-      setSiteConfig(config);
-      setPlan(planData);
-    });
-  }, [planId]);
+  const valor = parseFloat(valorParam);
 
+  // Load slug config
+  useEffect(() => {
+    const loadConfig = async () => {
+      setLoadingConfig(true);
+      const config = await fetchSlugConfig(slug);
+      setSlugConfig(config);
+      setLoadingConfig(false);
+    };
+    
+    loadConfig();
+  }, [slug]);
+
+  // Handle card input changes
   const handleCardInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     let maskedValue = value;
     
-    if (name === 'cardNumber') {
+    if (name === 'cardNumero') {
       maskedValue = maskCardNumber(value);
-    } else if (name === 'cardExpiry') {
+    } else if (name === 'cardValidade') {
       maskedValue = maskCardExpiry(value);
     } else if (name === 'cardCvv') {
       maskedValue = maskCVV(value);
@@ -95,87 +103,149 @@ export default function Pagamento() {
     setCardData(prev => ({ ...prev, [name]: maskedValue }));
   };
 
-  // Criar cliente no Asaas
-  const ensureAsaasCustomer = async (): Promise<string | null> => {
-    if (asaasCustomerId) return asaasCustomerId;
-    
-    const customerResult = await createAsaasCustomer({
-      name: customerName,
-      email: customerEmail,
-      cpfCnpj: customerCpfCnpj,
-      phone: customerPhone,
-      address: customerAddress + (customerAddressNumber ? ', ' + customerAddressNumber : ''),
-      zipCode: customerPostalCode,
-      city: customerCity,
-      state: customerState,
-    });
-    
-    if (customerResult.success && customerResult.customerId) {
-      setAsaasCustomerId(customerResult.customerId);
-      return customerResult.customerId;
+  // Status polling function
+  const pollPaymentStatus = useCallback(async () => {
+    if (!asaasPaymentId || paymentStatus === 'confirmed') {
+      console.log('[POLLING] Stopped - no paymentId or already confirmed');
+      return;
     }
     
-    toast({
-      title: 'Erro',
-      description: customerResult.error || 'Não foi possível criar o cliente.',
-      variant: 'destructive'
-    });
-    return null;
-  };
-
-  // Verificar status do pagamento PIX
-  const checkPaymentStatus = useCallback(async () => {
-    if (!paymentId || paymentSuccess) return;
+    // Check timeout (10 minutes)
+    const elapsed = Date.now() - pollingStartRef.current;
+    if (elapsed > POLLING_TIMEOUT) {
+      console.log('[POLLING] Timeout reached - stopping');
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      toast({
+        title: 'Tempo esgotado',
+        description: 'O tempo para confirmação do pagamento expirou. Tente novamente.',
+        variant: 'destructive'
+      });
+      return;
+    }
     
     setCheckingPayment(true);
-    const result = await getAsaasPaymentStatus(paymentId);
+    console.log('[POLLING] Checking payment status for:', asaasPaymentId);
+    
+    const result = await checkPaymentStatus(asaasPaymentId);
+    
+    console.log('[POLLING] Status result:', result);
     setCheckingPayment(false);
     
-    if (result.success && (result.status === 'CONFIRMED' || result.status === 'RECEIVED')) {
-      setPaymentSuccess(true);
-      toast({
-        title: 'Pagamento confirmado!',
-        description: 'Seu pagamento foi processado com sucesso.'
-      });
-    }
-  }, [paymentId, paymentSuccess, toast]);
-
-  // Polling para verificar status do PIX
-  useEffect(() => {
-    if (!paymentId || paymentSuccess) return;
-    
-    const interval = setInterval(checkPaymentStatus, 5000); // Verificar a cada 5 segundos
-    return () => clearInterval(interval);
-  }, [paymentId, paymentSuccess, checkPaymentStatus]);
-
-  const handleGeneratePix = async () => {
-    setLoading(true);
-    
-    try {
-      const customerId = await ensureAsaasCustomer();
-      if (!customerId) {
-        setLoading(false);
-        return;
+    if (result.status === 'confirmed') {
+      console.log('[POLLING] Payment CONFIRMED!');
+      setPaymentStatus('confirmed');
+      
+      // Stop polling
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
       
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 1);
+      toast({
+        title: '✅ Pagamento confirmado!',
+        description: 'Seu pagamento foi processado com sucesso.'
+      });
+    } else if (result.status === 'failed') {
+      console.log('[POLLING] Payment FAILED');
+      setPaymentStatus('failed');
       
-      const result = await createAsaasPayment({
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      
+      toast({
+        title: 'Pagamento não aprovado',
+        description: 'Houve um problema com seu pagamento. Tente novamente.',
+        variant: 'destructive'
+      });
+    }
+  }, [asaasPaymentId, paymentStatus, toast]);
+
+  // Start polling when we have a payment ID
+  useEffect(() => {
+    if (asaasPaymentId && paymentStatus === 'pending') {
+      console.log('[POLLING] Starting polling for:', asaasPaymentId);
+      pollingStartRef.current = Date.now();
+      
+      // Initial check
+      pollPaymentStatus();
+      
+      // Start interval
+      pollingRef.current = setInterval(pollPaymentStatus, POLLING_INTERVAL);
+      
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+    }
+  }, [asaasPaymentId, paymentStatus, pollPaymentStatus]);
+
+  // Redirect countdown after confirmation
+  useEffect(() => {
+    if (paymentStatus === 'confirmed') {
+      const countdown = setInterval(() => {
+        setRedirectCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdown);
+            // Redirect to configured URL
+            const redirectUrl = slugConfig?.redirect || '/';
+            console.log('[REDIRECT] Redirecting to:', redirectUrl);
+            window.location.href = redirectUrl;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => clearInterval(countdown);
+    }
+  }, [paymentStatus, slugConfig]);
+
+  // Generate PIX QR Code
+  const handleGeneratePix = async () => {
+    if (!customerId || !asaasCustomerId) {
+      toast({
+        title: 'Erro',
+        description: 'Dados do cliente não encontrados. Volte e refaça o cadastro.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setLoading(true);
+    console.log('[PIX] Generating PIX for customer:', { customerId, asaasCustomerId, valor, slug });
+    
+    try {
+      const result = await createPayment({
+        asaasCustomerId,
         customerId,
-        billingType: 'PIX',
-        value: plan?.priceValue || 49.90,
-        dueDate: dueDate.toISOString().split('T')[0],
-        description: `Assinatura ${plan?.name || 'Datebook'}`
+        valor,
+        metodo: 'PIX',
+        slug
       });
       
-      if (result.success && result.paymentId) {
-        setPaymentId(result.paymentId);
+      console.log('[PIX] createPayment result:', result);
+      
+      if (result.success && result.asaasPaymentId) {
+        setAsaasPaymentId(result.asaasPaymentId);
+        setPaymentStatus('pending');
         
-        if (result.pixData) {
-          setPixCode(result.pixData.payload || '');
-          if (result.pixData.encodedImage) {
-            setPixQrCode(`data:image/png;base64,${result.pixData.encodedImage}`);
+        if (result.pixCode) {
+          setPixCode(result.pixCode);
+        }
+        
+        if (result.pixQrCode) {
+          // Check if it's already a data URL or just base64
+          if (result.pixQrCode.startsWith('data:')) {
+            setPixQrCode(result.pixQrCode);
+          } else {
+            setPixQrCode(`data:image/png;base64,${result.pixQrCode}`);
           }
         }
         
@@ -191,6 +261,7 @@ export default function Pagamento() {
         });
       }
     } catch (error) {
+      console.error('[PIX] Error:', error);
       toast({
         title: 'Erro',
         description: 'Não foi possível gerar o código PIX.',
@@ -201,10 +272,11 @@ export default function Pagamento() {
     }
   };
 
+  // Pay with credit card
   const handlePayWithCard = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!cardData.cardNumber || !cardData.cardName || !cardData.cardExpiry || !cardData.cardCvv) {
+    if (!cardData.cardNumero || !cardData.cardNome || !cardData.cardValidade || !cardData.cardCvv) {
       toast({
         title: 'Dados incompletos',
         description: 'Preencha todos os dados do cartão.',
@@ -213,50 +285,48 @@ export default function Pagamento() {
       return;
     }
     
+    if (!customerId || !asaasCustomerId) {
+      toast({
+        title: 'Erro',
+        description: 'Dados do cliente não encontrados. Volte e refaça o cadastro.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     setLoading(true);
+    console.log('[CARD] Processing card payment:', { customerId, asaasCustomerId, valor, slug });
     
     try {
-      const customerId = await ensureAsaasCustomer();
-      if (!customerId) {
-        setLoading(false);
-        return;
-      }
-      
-      const [expiryMonth, expiryYear] = cardData.cardExpiry.split('/');
-      const fullYear = expiryYear.length === 2 ? `20${expiryYear}` : expiryYear;
-      
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 1);
-      
-      const result = await createAsaasPayment({
+      const result = await createPayment({
+        asaasCustomerId,
         customerId,
-        billingType: 'CREDIT_CARD',
-        value: plan?.priceValue || 49.90,
-        dueDate: dueDate.toISOString().split('T')[0],
-        description: `Assinatura ${plan?.name || 'Datebook'}`,
-        creditCard: {
-          holderName: cardData.cardName,
-          number: cardData.cardNumber.replace(/\s/g, ''),
-          expiryMonth,
-          expiryYear: fullYear,
-          ccv: cardData.cardCvv
-        },
-        creditCardHolderInfo: {
-          name: customerName,
-          email: customerEmail,
-          cpfCnpj: customerCpfCnpj,
-          postalCode: customerPostalCode,
-          addressNumber: customerAddressNumber,
-          phone: customerPhone
-        }
+        valor,
+        metodo: 'CARTAO',
+        slug,
+        cardNumero: cardData.cardNumero.replace(/\s/g, ''),
+        cardNome: cardData.cardNome,
+        cardValidade: cardData.cardValidade,
+        cardCvv: cardData.cardCvv
       });
       
-      if (result.success && (result.status === 'CONFIRMED' || result.status === 'PENDING')) {
-        setPaymentSuccess(true);
-        toast({
-          title: 'Pagamento aprovado!',
-          description: 'Seu pagamento foi processado com sucesso.'
-        });
+      console.log('[CARD] createPayment result:', result);
+      
+      if (result.success) {
+        if (result.status === 'confirmed') {
+          setPaymentStatus('confirmed');
+          toast({
+            title: '✅ Pagamento aprovado!',
+            description: 'Seu pagamento foi processado com sucesso.'
+          });
+        } else {
+          setAsaasPaymentId(result.asaasPaymentId || '');
+          setPaymentStatus('pending');
+          toast({
+            title: 'Pagamento em processamento',
+            description: 'Aguarde a confirmação.'
+          });
+        }
       } else {
         toast({
           title: 'Pagamento não aprovado',
@@ -265,6 +335,7 @@ export default function Pagamento() {
         });
       }
     } catch (error) {
+      console.error('[CARD] Error:', error);
       toast({
         title: 'Erro',
         description: 'Ocorreu um erro ao processar o pagamento.',
@@ -275,6 +346,7 @@ export default function Pagamento() {
     }
   };
 
+  // Copy PIX code
   const copyPixCode = () => {
     navigator.clipboard.writeText(pixCode);
     toast({
@@ -283,7 +355,17 @@ export default function Pagamento() {
     });
   };
 
-  if (paymentSuccess) {
+  // Loading state
+  if (loadingConfig) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Payment confirmed screen
+  if (paymentStatus === 'confirmed') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-card rounded-2xl border border-border p-8 text-center">
@@ -293,11 +375,21 @@ export default function Pagamento() {
           <h1 className="text-2xl font-bold text-foreground mb-2">
             Pagamento Confirmado!
           </h1>
-          <p className="text-muted-foreground mb-6">
-            Seu plano {plan?.name} foi ativado com sucesso. Você receberá um e-mail com as instruções de acesso.
+          <p className="text-muted-foreground mb-4">
+            Seu pagamento para {slugConfig?.destinatario || 'Datebook'} foi processado com sucesso.
           </p>
-          <Button variant="hero" size="lg" onClick={() => navigate('/')}>
-            Voltar para o início
+          <p className="text-sm text-muted-foreground mb-6">
+            Você será redirecionado em <span className="font-bold text-primary">{redirectCountdown}</span> segundos...
+          </p>
+          <Button 
+            variant="hero" 
+            size="lg" 
+            onClick={() => {
+              const redirectUrl = slugConfig?.redirect || '/';
+              window.location.href = redirectUrl;
+            }}
+          >
+            Continuar agora
           </Button>
         </div>
       </div>
@@ -311,18 +403,16 @@ export default function Pagamento() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <button 
-              onClick={() => navigate(`/cadastro?plano=${planId}`)}
+              onClick={() => navigate(`/cadastro?slug=${slug}`)}
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Voltar
             </button>
             <div className="flex items-center gap-2">
-              {siteConfig?.logo ? (
-                <img src={siteConfig.logo} alt={siteConfig.name} className="h-8" />
-              ) : (
-                <span className="text-xl font-bold text-primary">{siteConfig?.name || 'Datebook'}</span>
-              )}
+              <span className="text-xl font-bold text-primary">
+                {slugConfig?.destinatario || 'Datebook'}
+              </span>
             </div>
             <div className="w-20" />
           </div>
@@ -356,7 +446,7 @@ export default function Pagamento() {
                   Forma de Pagamento
                 </h1>
                 <p className="text-muted-foreground mb-8">
-                  Escolha como deseja pagar sua assinatura
+                  Escolha como deseja pagar
                 </p>
 
                 {/* Payment Method Selection */}
@@ -385,16 +475,16 @@ export default function Pagamento() {
                   
                   <button
                     type="button"
-                    onClick={() => setPaymentMethod('credit_card')}
+                    onClick={() => setPaymentMethod('cartao')}
                     className={`p-4 rounded-xl border-2 transition-all ${
-                      paymentMethod === 'credit_card'
+                      paymentMethod === 'cartao'
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        paymentMethod === 'credit_card' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                        paymentMethod === 'cartao' ? 'bg-primary text-primary-foreground' : 'bg-muted'
                       }`}>
                         <CreditCard className="w-5 h-5" />
                       </div>
@@ -409,7 +499,7 @@ export default function Pagamento() {
                 {/* PIX Payment */}
                 {paymentMethod === 'pix' && (
                   <div className="space-y-6">
-                    {!pixCode ? (
+                    {paymentStatus === 'idle' ? (
                       <div className="text-center py-8">
                         <div className="w-24 h-24 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4">
                           <QrCode className="w-12 h-12 text-muted-foreground" />
@@ -428,19 +518,7 @@ export default function Pagamento() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="p-4 bg-muted/50 rounded-xl">
-                          <p className="text-sm text-muted-foreground mb-2">Código PIX Copia e Cola:</p>
-                          <div className="flex gap-2">
-                            <Input 
-                              value={pixCode} 
-                              readOnly 
-                              className="font-mono text-xs"
-                            />
-                            <Button variant="outline" size="icon" onClick={copyPixCode}>
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
+                        {/* QR Code */}
                         <div className="text-center p-6 bg-background rounded-xl border border-border">
                           {pixQrCode ? (
                             <img 
@@ -457,14 +535,34 @@ export default function Pagamento() {
                             Escaneie o QR Code com o app do seu banco
                           </p>
                         </div>
-                        {checkingPayment && (
-                          <div className="flex items-center justify-center gap-2 text-sm text-primary">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Verificando pagamento...
+
+                        {/* PIX Copy/Paste Code */}
+                        {pixCode && (
+                          <div className="p-4 bg-muted/50 rounded-xl">
+                            <p className="text-sm text-muted-foreground mb-2">Código PIX Copia e Cola:</p>
+                            <div className="flex gap-2">
+                              <Input 
+                                value={pixCode} 
+                                readOnly 
+                                className="font-mono text-xs"
+                              />
+                              <Button variant="outline" size="icon" onClick={copyPixCode}>
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         )}
+
+                        {/* Payment Status */}
+                        <div className="flex items-center justify-center gap-2 p-4 rounded-xl bg-primary/5 text-primary">
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span className="font-medium">
+                            {checkingPayment ? 'Verificando pagamento...' : 'Aguardando pagamento...'}
+                          </span>
+                        </div>
+
                         <p className="text-sm text-center text-muted-foreground">
-                          O status do pagamento será atualizado automaticamente.
+                          O status será atualizado automaticamente após o pagamento.
                         </p>
                       </div>
                     )}
@@ -472,25 +570,25 @@ export default function Pagamento() {
                 )}
 
                 {/* Credit Card Payment */}
-                {paymentMethod === 'credit_card' && (
+                {paymentMethod === 'cartao' && (
                   <form onSubmit={handlePayWithCard} className="space-y-4">
                     <div>
-                      <Label htmlFor="cardNumber">Número do cartão</Label>
+                      <Label htmlFor="cardNumero">Número do cartão</Label>
                       <Input
-                        id="cardNumber"
-                        name="cardNumber"
-                        value={cardData.cardNumber}
+                        id="cardNumero"
+                        name="cardNumero"
+                        value={cardData.cardNumero}
                         onChange={handleCardInputChange}
                         placeholder="0000 0000 0000 0000"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="cardName">Nome no cartão</Label>
+                      <Label htmlFor="cardNome">Nome no cartão</Label>
                       <Input
-                        id="cardName"
-                        name="cardName"
-                        value={cardData.cardName}
+                        id="cardNome"
+                        name="cardNome"
+                        value={cardData.cardNome}
                         onChange={handleCardInputChange}
                         placeholder="Como está impresso no cartão"
                         required
@@ -498,11 +596,11 @@ export default function Pagamento() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="cardExpiry">Validade</Label>
+                        <Label htmlFor="cardValidade">Validade</Label>
                         <Input
-                          id="cardExpiry"
-                          name="cardExpiry"
-                          value={cardData.cardExpiry}
+                          id="cardValidade"
+                          name="cardValidade"
+                          value={cardData.cardValidade}
                           onChange={handleCardInputChange}
                           placeholder="MM/AA"
                           required
@@ -528,7 +626,7 @@ export default function Pagamento() {
                       className="w-full mt-4"
                       disabled={loading}
                     >
-                      {loading ? 'Processando...' : `Pagar ${plan?.price || ''}`}
+                      {loading ? 'Processando...' : `Pagar R$ ${valor.toFixed(2).replace('.', ',')}`}
                     </Button>
                   </form>
                 )}
@@ -542,38 +640,38 @@ export default function Pagamento() {
                   Resumo do Pedido
                 </h3>
                 
-                {plan ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Plano {plan.name}</span>
-                      <span className="font-medium text-foreground">{plan.price}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{plan.professionals}</span>
-                    </div>
-                    
-                    <div className="border-t border-border pt-4">
-                      <div className="flex justify-between items-baseline">
-                        <span className="font-semibold text-foreground">Total</span>
-                        <div className="text-right">
-                          <span className="text-2xl font-bold text-foreground">{plan.price}</span>
-                          <span className="text-muted-foreground text-sm">{plan.period}</span>
-                        </div>
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {slugConfig?.descricaoProduto || 'Assinatura'}
+                    </span>
+                    <span className="font-medium text-foreground">
+                      R$ {valor.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {slugConfig?.destinatario || 'Datebook'}
+                    </span>
+                  </div>
+                  
+                  <div className="border-t border-border pt-4">
+                    <div className="flex justify-between items-baseline">
+                      <span className="font-semibold text-foreground">Total</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-foreground">
+                          R$ {valor.toFixed(2).replace('.', ',')}
+                        </span>
                       </div>
                     </div>
-                    
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                      <p className="text-sm text-green-600 dark:text-green-400">
-                        ✓ Cancele quando quiser
-                      </p>
-                    </div>
                   </div>
-                ) : (
-                  <div className="animate-pulse space-y-4">
-                    <div className="h-8 bg-muted rounded" />
-                    <div className="h-20 bg-muted rounded" />
+                  
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      ✓ Pagamento seguro
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
