@@ -22,7 +22,7 @@ export function Promotion() {
   }
 
   const handleClick = () => {
-    navigate('/cadastro?promo=trial30');
+    navigate('/cadastro?slug=datebook&plano=promo');
   };
 
   return (
