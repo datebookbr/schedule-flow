@@ -15,7 +15,7 @@ export function Pricing() {
   }, []);
 
   const handleSelectPlan = (plan: PricingPlan) => {
-    navigate(`/cadastro?plano=${plan.id}`);
+    navigate(`/cadastro?slug=datebook&plano=${plan.id}`);
   };
 
   if (!texts) return null;

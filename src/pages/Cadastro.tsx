@@ -36,6 +36,7 @@ export default function Cadastro() {
   const { toast } = useToast();
   
   const slug = searchParams.get('slug') || 'datebook';
+  const plano = searchParams.get('plano') || '';
   
   const [slugConfig, setSlugConfig] = useState<SlugConfig | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,8 @@ export default function Cadastro() {
   useEffect(() => {
     const loadConfig = async () => {
       setLoadingConfig(true);
-      const config = await fetchSlugConfig(slug);
+      console.log('[CADASTRO] Carregando config com slug:', slug, 'plano:', plano);
+      const config = await fetchSlugConfig(slug, plano);
       setSlugConfig(config);
       setLoadingConfig(false);
       
@@ -74,7 +76,7 @@ export default function Cadastro() {
     };
     
     loadConfig();
-  }, [slug, toast]);
+  }, [slug, plano, toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

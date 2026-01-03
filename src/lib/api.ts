@@ -628,9 +628,9 @@ export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
 }
 
 // ============= SLUG CONFIG (GET) =============
-// GET /api/land_cadastro.asp?slug=xxx
-export async function fetchSlugConfig(slug: string): Promise<SlugConfig> {
-  debugLog('API', `[SLUG] fetchSlugConfig iniciado`, { slug, isDevelopment });
+// GET /api/land_cadastro.asp?slug=xxx&plano=xxx
+export async function fetchSlugConfig(slug: string, plano?: string): Promise<SlugConfig> {
+  debugLog('API', `[SLUG] fetchSlugConfig iniciado`, { slug, plano, isDevelopment });
   
   if (isDevelopment) {
     debugWarn('API', `[DEV MODE] Simulando fetchSlugConfig`);
@@ -644,7 +644,10 @@ export async function fetchSlugConfig(slug: string): Promise<SlugConfig> {
   }
   
   try {
-    const url = `${API_BASE_URL}/land_cadastro.asp?slug=${encodeURIComponent(slug)}`;
+    let url = `${API_BASE_URL}/land_cadastro.asp?slug=${encodeURIComponent(slug)}`;
+    if (plano) {
+      url += `&plano=${encodeURIComponent(plano)}`;
+    }
     debugLog('API', `[SLUG] Fazendo GET para: ${url}`);
     
     const response = await fetch(url);
