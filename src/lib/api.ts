@@ -220,6 +220,7 @@ export interface CustomerResponse {
   success: boolean;
   customerId?: string;
   asaasCustomerId?: string;
+  redirect?: string;
   message?: string;
   error?: string;
 }
@@ -672,6 +673,7 @@ export async function registerCustomer(data: CustomerData): Promise<CustomerResp
       success: true, 
       customerId: 'dev-' + Date.now(), 
       asaasCustomerId: 'cus_dev_' + Date.now(),
+      redirect: 'https://datebook.com.br/sucesso',
       message: 'Cliente cadastrado com sucesso' 
     };
   }
@@ -693,6 +695,7 @@ export async function registerCustomer(data: CustomerData): Promise<CustomerResp
       success: result.success === true,
       customerId: result.customerId,
       asaasCustomerId: result.asaasCustomerId,
+      redirect: result.redirect,
       message: result.message,
       error: result.error
     };

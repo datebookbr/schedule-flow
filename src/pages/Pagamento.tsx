@@ -45,6 +45,7 @@ export default function Pagamento() {
   const customerId = searchParams.get('customerId') || '';
   const asaasCustomerId = searchParams.get('asaasCustomerId') || '';
   const valorParam = searchParams.get('valor') || '49.90';
+  const clientRedirect = searchParams.get('clientRedirect') || '';
   
   const [slugConfig, setSlugConfig] = useState<SlugConfig | null>(null);
   const [loading, setLoading] = useState(false);
@@ -193,8 +194,8 @@ export default function Pagamento() {
         setRedirectCountdown(prev => {
           if (prev <= 1) {
             clearInterval(countdown);
-            // Redirect to configured URL
-            const redirectUrl = slugConfig?.redirect || '/';
+            // Use client redirect URL from clientes table (passed via query param), fallback to slugConfig
+            const redirectUrl = clientRedirect || slugConfig?.redirect || '/';
             console.log('[REDIRECT] Redirecting to:', redirectUrl);
             window.location.href = redirectUrl;
             return 0;
@@ -205,7 +206,7 @@ export default function Pagamento() {
       
       return () => clearInterval(countdown);
     }
-  }, [paymentStatus, slugConfig]);
+  }, [paymentStatus, clientRedirect, slugConfig]);
 
   // Generate PIX QR Code
   const handleGeneratePix = async () => {
@@ -385,7 +386,8 @@ export default function Pagamento() {
             variant="hero" 
             size="lg" 
             onClick={() => {
-              const redirectUrl = slugConfig?.redirect || '/';
+              // Use client redirect URL from clientes table, fallback to slugConfig
+              const redirectUrl = clientRedirect || slugConfig?.redirect || '/';
               window.location.href = redirectUrl;
             }}
           >

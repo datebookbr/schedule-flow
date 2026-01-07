@@ -180,15 +180,26 @@ export default function Cadastro() {
           description: result.message || 'Cliente cadastrado com sucesso.'
         });
         
-        // Navigate to payment page with all necessary IDs
-        const params = new URLSearchParams({
-          slug: slug,
-          customerId: result.customerId,
-          asaasCustomerId: result.asaasCustomerId,
-          valor: String(slugConfig?.valor || 49.90)
-        });
+        // Check if plan is promotional (value = 0)
+        const planValue = slugConfig?.valor ?? 0;
+        const isPromotional = planValue === 0;
         
-        navigate(`/pagamento?${params.toString()}`);
+        if (isPromotional && result.redirect) {
+          // Redirect directly to the client's redirect URL for promotional plans
+          console.log('[CADASTRO] Plano promocional detectado (valor = 0). Redirecionando para:', result.redirect);
+          window.location.href = result.redirect;
+        } else {
+          // Navigate to payment page with all necessary IDs including client redirect
+          const params = new URLSearchParams({
+            slug: slug,
+            customerId: result.customerId,
+            asaasCustomerId: result.asaasCustomerId,
+            valor: String(planValue),
+            ...(result.redirect && { clientRedirect: result.redirect })
+          });
+          
+          navigate(`/pagamento?${params.toString()}`);
+        }
       } else {
         toast({
           title: 'Erro no cadastro',
