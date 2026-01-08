@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Building2, User, MapPin } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, User, MapPin, Loader2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,6 +49,7 @@ export default function Cadastro() {
     whatsapp: '',
     cpfCnpj: '',
     companhia: '',
+    slugSite: '',
     rua: '',
     numero: '',
     bairro: '',
@@ -57,6 +58,11 @@ export default function Cadastro() {
     cep: '',
     descricao: ''
   });
+  
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable'>('idle');
+  const [slugError, setSlugError] = useState('');
+  const slugCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSuggestedSlugRef = useRef<string>('');
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -105,6 +111,85 @@ export default function Cadastro() {
     setFormData(prev => ({ ...prev, uf: value }));
   };
 
+  // Generate slug from company name
+  const generateSlugFromName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove acentos
+      .replace(/[^a-z0-9]/g, '')       // remove especiais e espaços
+      .substring(0, 20);
+  };
+
+  // Check slug availability via API
+  const checkSlugAvailability = useCallback(async (slugValue: string) => {
+    if (!slugValue || slugValue.length < 3) {
+      setSlugStatus('idle');
+      setSlugError('');
+      return;
+    }
+    
+    setSlugStatus('checking');
+    
+    try {
+      const response = await fetch(`/api/check_slug.asp?slug=${encodeURIComponent(slugValue)}`);
+      const data = await response.json();
+      
+      if (data.disponivel) {
+        setSlugStatus('available');
+        setSlugError('');
+      } else {
+        setSlugStatus('unavailable');
+        setSlugError('Este endereço já está em uso');
+      }
+    } catch (error) {
+      console.error('[SLUG] Erro ao verificar disponibilidade:', error);
+      setSlugStatus('idle');
+      setSlugError('Erro ao verificar disponibilidade');
+    }
+  }, []);
+
+  // Handle slug input change with debounce
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 20);
+    
+    setFormData(prev => ({ ...prev, slugSite: value }));
+    
+    // Clear previous timeout
+    if (slugCheckTimeoutRef.current) {
+      clearTimeout(slugCheckTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounce (500ms)
+    slugCheckTimeoutRef.current = setTimeout(() => {
+      checkSlugAvailability(value);
+    }, 500);
+  };
+
+  // Auto-suggest slug when company name changes
+  useEffect(() => {
+    if (formData.companhia) {
+      const suggestedSlug = generateSlugFromName(formData.companhia);
+      
+      // Only auto-fill if slugSite is empty or equals previous suggestion
+      if (!formData.slugSite || formData.slugSite === lastSuggestedSlugRef.current) {
+        setFormData(prev => ({ ...prev, slugSite: suggestedSlug }));
+        lastSuggestedSlugRef.current = suggestedSlug;
+        
+        // Check availability
+        if (slugCheckTimeoutRef.current) {
+          clearTimeout(slugCheckTimeoutRef.current);
+        }
+        slugCheckTimeoutRef.current = setTimeout(() => {
+          checkSlugAvailability(suggestedSlug);
+        }, 500);
+      }
+    }
+  }, [formData.companhia, checkSlugAvailability]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -148,6 +233,34 @@ export default function Cadastro() {
       return;
     }
     
+    // Validação de slug
+    if (formData.slugSite && formData.slugSite.length < 3) {
+      toast({
+        title: 'Endereço do site inválido',
+        description: 'O endereço deve ter pelo menos 3 caracteres.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (slugStatus === 'unavailable') {
+      toast({
+        title: 'Endereço indisponível',
+        description: 'Este endereço já está em uso. Escolha outro.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (slugStatus === 'checking') {
+      toast({
+        title: 'Aguarde',
+        description: 'Verificando disponibilidade do endereço...',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -158,6 +271,7 @@ export default function Cadastro() {
         cpfCnpj: formData.cpfCnpj,
         tipoPessoa: clientType === 'pf' ? 'PF' : 'PJ',
         companhia: formData.companhia || undefined,
+        slugSite: formData.slugSite || undefined,
         rua: formData.rua || undefined,
         numero: formData.numero || undefined,
         bairro: formData.bairro || undefined,
@@ -359,6 +473,38 @@ export default function Cadastro() {
                           onChange={handleInputChange}
                           placeholder="Nome da sua empresa ou estabelecimento"
                         />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label htmlFor="slugSite">Endereço do site</Label>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground whitespace-nowrap bg-muted px-3 py-2 rounded-l-md border border-r-0 border-input">
+                            datebook.com.br/
+                          </span>
+                          <div className="relative flex-1">
+                            <Input
+                              id="slugSite"
+                              name="slugSite"
+                              value={formData.slugSite}
+                              onChange={handleSlugChange}
+                              placeholder="suaempresa"
+                              maxLength={20}
+                              className={`rounded-l-none ${
+                                slugStatus === 'available' ? 'border-green-500 focus-visible:ring-green-500' : ''
+                              } ${
+                                slugStatus === 'unavailable' ? 'border-red-500 focus-visible:ring-red-500' : ''
+                              }`}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              {slugStatus === 'checking' && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                              {slugStatus === 'available' && <Check className="w-4 h-4 text-green-500" />}
+                              {slugStatus === 'unavailable' && <X className="w-4 h-4 text-red-500" />}
+                            </div>
+                          </div>
+                        </div>
+                        {slugError && <p className="text-sm text-red-500 mt-1">{slugError}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Máximo de 20 caracteres. Use apenas letras minúsculas e números.
+                        </p>
                       </div>
                     </div>
                   </div>
