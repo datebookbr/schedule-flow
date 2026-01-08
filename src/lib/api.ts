@@ -196,6 +196,7 @@ export interface CustomerData {
   cpfCnpj: string;
   tipoPessoa: 'PF' | 'PJ';
   companhia?: string;
+  slugSite?: string;
   rua?: string;
   numero?: string;
   bairro?: string;
