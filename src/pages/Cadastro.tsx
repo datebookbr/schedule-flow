@@ -637,7 +637,7 @@ export default function Cadastro() {
                   <div className="flex justify-between items-baseline">
                     <span className="text-muted-foreground">Valor</span>
                     <span className="text-2xl font-bold text-foreground">
-                      R$ {(slugConfig?.valor || 49.90).toFixed(2).replace('.', ',')}
+                      R$ {(slugConfig?.valor ?? 0).toFixed(2).replace('.', ',')}
                     </span>
                   </div>
                 </div>
