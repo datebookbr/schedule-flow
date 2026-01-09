@@ -605,7 +605,7 @@ export default function Cadastro() {
                     className="w-full"
                     disabled={loading}
                   >
-                    {loading ? 'Processando...' : 'Continuar para Pagamento'}
+                    {loading ? 'Processando...' : (plano === 'promo' || slugConfig?.valor === 0) ? 'Continuar para Cadastrar' : 'Continuar para Pagamento'}
                     <ArrowRight className="w-5 h-5" />
                   </Button>
                 </form>
