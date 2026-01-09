@@ -374,13 +374,17 @@ export default function Cadastro() {
               </div>
               <span className="text-sm font-medium text-foreground">Cadastro</span>
             </div>
-            <div className="w-12 h-0.5 bg-border" />
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-semibold">
-                2
-              </div>
-              <span className="text-sm font-medium text-muted-foreground">Pagamento</span>
-            </div>
+            {!(plano === 'promo' || slugConfig?.valor === 0) && (
+              <>
+                <div className="w-12 h-0.5 bg-border" />
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-semibold">
+                    2
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground">Pagamento</span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
