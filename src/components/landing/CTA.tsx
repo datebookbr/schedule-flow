@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, MessageCircle } from 'lucide-react';
-import { fetchPageTexts, PageTexts } from '@/lib/api';
+import { fetchPageTexts, PageTexts, ApiError, isApiFailure } from '@/lib/api';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 export function CTA() {
   const [texts, setTexts] = useState<PageTexts['cta'] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    const result = await fetchPageTexts();
+    if (isApiFailure(result)) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+    setTexts(result.data.cta);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchPageTexts().then(data => setTexts(data.cta));
+    loadData();
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -16,6 +32,26 @@ export function CTA() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (loading) {
+    return (
+      <section className="py-20 md:py-32 bg-gradient-hero relative overflow-hidden">
+        <div className="container mx-auto px-4 text-center">
+          <div className="animate-pulse text-primary-foreground">Carregando...</div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="py-20 md:py-32 bg-gradient-hero relative overflow-hidden">
+        <div className="container mx-auto px-4">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar CTA" />
+        </div>
+      </section>
+    );
+  }
 
   if (!texts) return null;
 

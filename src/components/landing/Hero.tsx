@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar, ArrowRight, MessageCircle } from 'lucide-react';
-import { fetchPageTexts, PageTexts } from '@/lib/api';
+import { fetchPageTexts, PageTexts, ApiError, isApiFailure } from '@/lib/api';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 export function Hero() {
   const [texts, setTexts] = useState<PageTexts['hero'] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    const result = await fetchPageTexts();
+    if (isApiFailure(result)) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+    setTexts(result.data.hero);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchPageTexts().then(data => setTexts(data.hero));
+    loadData();
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -16,6 +32,24 @@ export function Hero() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (loading) {
+    return (
+      <section className="relative min-h-screen bg-gradient-hero overflow-hidden flex items-center justify-center">
+        <div className="animate-pulse text-primary-foreground">Carregando...</div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="relative min-h-screen bg-gradient-hero overflow-hidden py-32">
+        <div className="container mx-auto px-4">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar Hero" />
+        </div>
+      </section>
+    );
+  }
 
   if (!texts) return null;
 

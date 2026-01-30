@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, Calendar } from 'lucide-react';
-import { fetchSiteConfig, fetchPageTexts, SiteConfig, PageTexts } from '@/lib/api';
+import { fetchSiteConfig, fetchPageTexts, SiteConfig, PageTexts, isApiFailure } from '@/lib/api';
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -18,8 +18,20 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    fetchSiteConfig().then(setSiteConfig);
-    fetchPageTexts().then(data => setTexts(data.header));
+    fetchSiteConfig().then(result => {
+      if (isApiFailure(result)) {
+        console.error('[Header] Erro ao carregar config:', result.error);
+        return;
+      }
+      setSiteConfig(result.data);
+    });
+    fetchPageTexts().then(result => {
+      if (isApiFailure(result)) {
+        console.error('[Header] Erro ao carregar textos:', result.error);
+        return;
+      }
+      setTexts(result.data.header);
+    });
   }, []);
 
   const scrollToSection = (id: string) => {

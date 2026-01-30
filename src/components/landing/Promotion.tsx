@@ -2,22 +2,29 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Gift, Clock, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchPromotion, PromotionConfig } from '@/lib/api';
+import { fetchPromotion, PromotionConfig, ApiError, isApiFailure } from '@/lib/api';
 
 export function Promotion() {
   const navigate = useNavigate();
   const [promotion, setPromotion] = useState<PromotionConfig | null>(null);
   const [isVisible, setIsVisible] = useState(true);
+  const [error, setError] = useState<ApiError | null>(null);
 
   useEffect(() => {
-    fetchPromotion().then((data) => {
-      if (data?.active) {
-        setPromotion(data);
+    fetchPromotion().then((result) => {
+      if (isApiFailure(result)) {
+        setError(result.error);
+        console.error('[Promotion] Erro ao carregar promoção:', result.error);
+        return;
+      }
+      if (result.data?.active) {
+        setPromotion(result.data);
       }
     });
   }, []);
 
-  if (!promotion || !promotion.active || !isVisible) {
+  // Don't show anything if there's an error or no active promotion
+  if (error || !promotion || !promotion.active || !isVisible) {
     return null;
   }
 

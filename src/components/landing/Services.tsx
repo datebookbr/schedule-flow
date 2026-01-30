@@ -1,15 +1,43 @@
 import { useEffect, useState } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchServices, fetchPageTexts, type Service, type PageTexts } from '@/lib/api';
+import { fetchServices, fetchPageTexts, type Service, type PageTexts, type ApiError, isApiFailure } from '@/lib/api';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 export function Services() {
   const [services, setServices] = useState<Service[]>([]);
   const [texts, setTexts] = useState<PageTexts['services'] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const [servicesResult, textsResult] = await Promise.all([
+      fetchServices(),
+      fetchPageTexts()
+    ]);
+    
+    if (isApiFailure(servicesResult)) {
+      setError(servicesResult.error);
+      setLoading(false);
+      return;
+    }
+    setServices(servicesResult.data);
+    
+    if (isApiFailure(textsResult)) {
+      setError(textsResult.error);
+      setLoading(false);
+      return;
+    }
+    setTexts(textsResult.data.services);
+    
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchServices().then(setServices);
-    fetchPageTexts().then(data => setTexts(data.services));
+    loadData();
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -18,6 +46,26 @@ export function Services() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (loading) {
+    return (
+      <section id="servicos" className="py-20 md:py-32 bg-background">
+        <div className="container mx-auto px-4 text-center">
+          <div className="animate-pulse">Carregando serviços...</div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section id="servicos" className="py-20 md:py-32 bg-background">
+        <div className="container mx-auto px-4">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar Serviços" />
+        </div>
+      </section>
+    );
+  }
 
   if (!texts) return null;
 

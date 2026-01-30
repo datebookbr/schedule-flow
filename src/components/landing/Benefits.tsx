@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MessageCircle, Globe, Calendar, Users, Share2, Bell } from 'lucide-react';
-import { fetchBenefits, fetchPageTexts, type Benefit, type PageTexts } from '@/lib/api';
+import { fetchBenefits, fetchPageTexts, type Benefit, type PageTexts, type ApiError, isApiFailure } from '@/lib/api';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   MessageCircle,
@@ -14,11 +15,58 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 export function Benefits() {
   const [benefits, setBenefits] = useState<Benefit[]>([]);
   const [texts, setTexts] = useState<PageTexts['benefits'] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const [benefitsResult, textsResult] = await Promise.all([
+      fetchBenefits(),
+      fetchPageTexts()
+    ]);
+    
+    if (isApiFailure(benefitsResult)) {
+      setError(benefitsResult.error);
+      setLoading(false);
+      return;
+    }
+    setBenefits(benefitsResult.data);
+    
+    if (isApiFailure(textsResult)) {
+      setError(textsResult.error);
+      setLoading(false);
+      return;
+    }
+    setTexts(textsResult.data.benefits);
+    
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchBenefits().then(setBenefits);
-    fetchPageTexts().then(data => setTexts(data.benefits));
+    loadData();
   }, []);
+
+  if (loading) {
+    return (
+      <section id="beneficios" className="py-20 md:py-32 bg-gradient-subtle">
+        <div className="container mx-auto px-4 text-center">
+          <div className="animate-pulse">Carregando benefícios...</div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section id="beneficios" className="py-20 md:py-32 bg-gradient-subtle">
+        <div className="container mx-auto px-4">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar Benefícios" />
+        </div>
+      </section>
+    );
+  }
 
   if (!texts) return null;
 

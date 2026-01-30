@@ -2,21 +2,69 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchPricing, fetchPageTexts, type PricingPlan, type PageTexts } from '@/lib/api';
+import { fetchPricing, fetchPageTexts, type PricingPlan, type PageTexts, type ApiError, isApiFailure } from '@/lib/api';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 export function Pricing() {
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [texts, setTexts] = useState<PageTexts['pricing'] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const [pricingResult, textsResult] = await Promise.all([
+      fetchPricing(),
+      fetchPageTexts()
+    ]);
+    
+    if (isApiFailure(pricingResult)) {
+      setError(pricingResult.error);
+      setLoading(false);
+      return;
+    }
+    setPlans(pricingResult.data);
+    
+    if (isApiFailure(textsResult)) {
+      setError(textsResult.error);
+      setLoading(false);
+      return;
+    }
+    setTexts(textsResult.data.pricing);
+    
+    setLoading(false);
+  };
+
   useEffect(() => {
-    fetchPricing().then(setPlans);
-    fetchPageTexts().then(data => setTexts(data.pricing));
+    loadData();
   }, []);
 
   const handleSelectPlan = (plan: PricingPlan) => {
     navigate(`/cadastro?slug=datebook&plano=${plan.id}`);
   };
+
+  if (loading) {
+    return (
+      <section id="precos" className="py-20 md:py-32 bg-gradient-subtle">
+        <div className="container mx-auto px-4 text-center">
+          <div className="animate-pulse">Carregando planos...</div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section id="precos" className="py-20 md:py-32 bg-gradient-subtle">
+        <div className="container mx-auto px-4">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar Preços" />
+        </div>
+      </section>
+    );
+  }
 
   if (!texts) return null;
 
