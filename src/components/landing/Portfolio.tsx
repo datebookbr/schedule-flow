@@ -1,24 +1,29 @@
 import { useEffect, useState } from 'react';
-import { fetchPortfolio, PortfolioData } from '@/lib/api';
+import { fetchPortfolio, PortfolioData, ApiError, isApiFailure } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { MapPin, Star } from 'lucide-react';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 export const Portfolio = () => {
   const [data, setData] = useState<PortfolioData | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    const result = await fetchPortfolio();
+    if (isApiFailure(result)) {
+      setError(result.error);
+      setLoading(false);
+      return;
+    }
+    setData(result.data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const portfolioData = await fetchPortfolio();
-        setData(portfolioData);
-      } catch (error) {
-        console.error('Error loading portfolio:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
   }, []);
 
@@ -35,6 +40,16 @@ export const Portfolio = () => {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="py-20 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar Portfólio" />
         </div>
       </section>
     );

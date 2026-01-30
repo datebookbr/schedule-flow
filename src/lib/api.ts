@@ -3,10 +3,41 @@ const API_BASE_URL = '/api';
 
 // Check if we're in development mode (Lovable preview)
 const isDevelopment = window.location.hostname.includes('lovableproject.com') || 
+                       window.location.hostname.includes('lovable.app') ||
                        window.location.hostname === 'localhost';
 
 // Debug mode - set to true to see detailed logs
 const DEBUG_MODE = true;
+
+// Store API errors for display
+export interface ApiError {
+  apiName: string;
+  url: string;
+  error: string;
+  details?: string;
+  timestamp: string;
+  status?: number;
+  statusText?: string;
+  rawResponse?: string;
+}
+
+const apiErrors: ApiError[] = [];
+
+export function getApiErrors(): ApiError[] {
+  return [...apiErrors];
+}
+
+export function clearApiErrors(): void {
+  apiErrors.length = 0;
+}
+
+function addApiError(error: ApiError): void {
+  apiErrors.push(error);
+  // Keep only last 20 errors
+  if (apiErrors.length > 20) {
+    apiErrors.shift();
+  }
+}
 
 function debugLog(category: string, message: string, data?: unknown) {
   if (DEBUG_MODE) {
@@ -266,7 +297,7 @@ export interface PortfolioData {
   estabelecimentos: PortfolioEstabelecimento[];
 }
 
-// ============= FALLBACK DATA FOR DEVELOPMENT =============
+// ============= FALLBACK DATA FOR DEVELOPMENT ONLY =============
 
 const fallbackSiteConfig: SiteConfig = {
   name: "Datebook",
@@ -472,15 +503,40 @@ const fallbackPortfolio: PortfolioData = {
   ]
 };
 
-// ============= API FUNCTIONS WITH FALLBACK =============
+// ============= API RESULT TYPE =============
+export interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<T> {
+export interface ApiFailure {
+  success: false;
+  error: ApiError;
+}
+
+export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
+
+// Type guard for API results
+export function isApiSuccess<T>(result: ApiResult<T>): result is ApiSuccess<T> {
+  return result.success === true;
+}
+
+export function isApiFailure<T>(result: ApiResult<T>): result is ApiFailure {
+  return result.success === false;
+}
+
+// ============= API FUNCTIONS - NO FALLBACK IN PRODUCTION =============
+
+async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<ApiResult<T>> {
   debugLog('API', `Iniciando fetch: ${apiName}`, { url, isDevelopment });
   
+  // ONLY use fallback in development mode
   if (isDevelopment) {
     debugWarn('API', `[DEV MODE] Usando fallback para: ${apiName}`, { url });
-    return fallback;
+    return { success: true, data: fallback };
   }
+  
+  const timestamp = new Date().toISOString();
   
   try {
     debugLog('API', `Fazendo requisição para: ${url}`);
@@ -498,20 +554,56 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
     
     const text = await response.text();
     
-    debugLog('API', `Conteúdo raw de ${apiName} (primeiros 200 chars):`, text.substring(0, 200));
+    debugLog('API', `Conteúdo raw de ${apiName} (primeiros 500 chars):`, text.substring(0, 500));
     
+    // Check for HTML response (error page)
     if (text.startsWith('<!') || text.startsWith('<html') || text.startsWith('<HTML')) {
-      debugError('API', `${apiName} retornou HTML ao invés de JSON!`, {
+      const error: ApiError = {
+        apiName,
         url,
+        error: 'API retornou HTML ao invés de JSON',
+        details: `Status: ${response.status} ${response.statusText}. Primeiros 200 chars: ${text.substring(0, 200)}`,
+        timestamp,
         status: response.status,
-        primeiros100chars: text.substring(0, 100)
-      });
-      return fallback;
+        statusText: response.statusText,
+        rawResponse: text.substring(0, 1000)
+      };
+      debugError('API', `${apiName} retornou HTML ao invés de JSON!`, error);
+      addApiError(error);
+      return { success: false, error };
     }
     
+    // Check for empty response
     if (!text || text.trim() === '') {
-      debugError('API', `${apiName} retornou resposta vazia!`, { url });
-      return fallback;
+      const error: ApiError = {
+        apiName,
+        url,
+        error: 'API retornou resposta vazia',
+        details: `Status: ${response.status} ${response.statusText}`,
+        timestamp,
+        status: response.status,
+        statusText: response.statusText
+      };
+      debugError('API', `${apiName} retornou resposta vazia!`, error);
+      addApiError(error);
+      return { success: false, error };
+    }
+    
+    // Check for non-200 status
+    if (!response.ok) {
+      const error: ApiError = {
+        apiName,
+        url,
+        error: `API retornou erro HTTP ${response.status}`,
+        details: `${response.statusText}. Resposta: ${text.substring(0, 500)}`,
+        timestamp,
+        status: response.status,
+        statusText: response.statusText,
+        rawResponse: text.substring(0, 1000)
+      };
+      debugError('API', `${apiName} retornou erro HTTP!`, error);
+      addApiError(error);
+      return { success: false, error };
     }
     
     try {
@@ -520,6 +612,7 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
       
       let result: unknown;
       
+      // Handle wrapped response format {success, data}
       if (parsed && typeof parsed === 'object' && 'success' in parsed && 'data' in parsed) {
         debugLog('API', `${apiName} - Extraindo .data do response wrapper`, parsed.data);
         result = parsed.data;
@@ -527,63 +620,92 @@ async function safeFetch<T>(url: string, fallback: T, apiName: string): Promise<
         result = parsed;
       }
       
+      // Normalize text fields
       const normalized = normalizeTextField(result);
       debugLog('API', `${apiName} - Dados normalizados`, normalized);
       
-      return normalized as T;
+      return { success: true, data: normalized as T };
     } catch (parseError) {
-      debugError('API', `Erro ao parsear JSON de ${apiName}:`, {
-        error: parseError,
-        text: text.substring(0, 500)
-      });
-      return fallback;
+      const error: ApiError = {
+        apiName,
+        url,
+        error: 'Erro ao parsear JSON da resposta',
+        details: `${parseError instanceof Error ? parseError.message : String(parseError)}. Resposta raw: ${text.substring(0, 500)}`,
+        timestamp,
+        status: response.status,
+        statusText: response.statusText,
+        rawResponse: text.substring(0, 1000)
+      };
+      debugError('API', `Erro ao parsear JSON de ${apiName}:`, error);
+      addApiError(error);
+      return { success: false, error };
     }
     
-  } catch (error) {
-    debugError('API', `Erro de rede em ${apiName}:`, {
+  } catch (networkError) {
+    const error: ApiError = {
+      apiName,
       url,
-      error: error instanceof Error ? { message: error.message, stack: error.stack } : error
-    });
-    return fallback;
+      error: 'Erro de rede ao acessar API',
+      details: networkError instanceof Error 
+        ? `${networkError.message}${networkError.stack ? '\n\nStack: ' + networkError.stack : ''}`
+        : String(networkError),
+      timestamp
+    };
+    debugError('API', `Erro de rede em ${apiName}:`, error);
+    addApiError(error);
+    return { success: false, error };
   }
 }
 
-export async function fetchSiteConfig(): Promise<SiteConfig> {
+export async function fetchSiteConfig(): Promise<ApiResult<SiteConfig>> {
   return safeFetch(`${API_BASE_URL}/land_config.asp`, fallbackSiteConfig, 'fetchSiteConfig');
 }
 
-export async function fetchPageTexts(): Promise<PageTexts> {
+export async function fetchPageTexts(): Promise<ApiResult<PageTexts>> {
   return safeFetch(`${API_BASE_URL}/land_textos.asp`, fallbackPageTexts, 'fetchPageTexts');
 }
 
-export async function fetchPromotion(): Promise<PromotionConfig | null> {
+export async function fetchPromotion(): Promise<ApiResult<PromotionConfig | null>> {
   return safeFetch(`${API_BASE_URL}/land_promocao.asp`, fallbackPromotion, 'fetchPromotion');
 }
 
-export async function fetchLegalContent(): Promise<LegalContent> {
+export async function fetchLegalContent(): Promise<ApiResult<LegalContent>> {
   return safeFetch(`${API_BASE_URL}/land_legal.asp`, fallbackLegalContent, 'fetchLegalContent');
 }
 
-export async function fetchBenefits(): Promise<Benefit[]> {
+export async function fetchBenefits(): Promise<ApiResult<Benefit[]>> {
   return safeFetch(`${API_BASE_URL}/land_beneficios.asp`, fallbackBenefits, 'fetchBenefits');
 }
 
-export async function fetchServices(): Promise<Service[]> {
+export async function fetchServices(): Promise<ApiResult<Service[]>> {
   return safeFetch(`${API_BASE_URL}/land_servicos.asp`, fallbackServices, 'fetchServices');
 }
 
-export async function fetchPricing(): Promise<PricingPlan[]> {
+export async function fetchPricing(): Promise<ApiResult<PricingPlan[]>> {
   return safeFetch(`${API_BASE_URL}/land_precos.asp`, fallbackPricing, 'fetchPricing');
 }
 
-export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
+export async function fetchPlanById(id: string): Promise<ApiResult<PricingPlan>> {
   debugLog('API', `fetchPlanById iniciado`, { id, isDevelopment });
   
   if (isDevelopment) {
-    const plan = fallbackPricing.find(p => p.id === id) || null;
-    debugWarn('API', `[DEV MODE] Usando fallback para fetchPlanById`, { id, encontrado: !!plan });
-    return plan;
+    const plan = fallbackPricing.find(p => p.id === id);
+    if (plan) {
+      debugWarn('API', `[DEV MODE] Usando fallback para fetchPlanById`, { id });
+      return { success: true, data: plan };
+    }
+    return { 
+      success: false, 
+      error: {
+        apiName: 'fetchPlanById',
+        url: `${API_BASE_URL}/land_plano.asp?id=${id}`,
+        error: 'Plano não encontrado no fallback',
+        timestamp: new Date().toISOString()
+      }
+    };
   }
+  
+  const timestamp = new Date().toISOString();
   
   try {
     const url = `${API_BASE_URL}/land_plano.asp?id=${id}`;
@@ -592,11 +714,33 @@ export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
     const response = await fetch(url);
     const text = await response.text();
     
-    debugLog('API', `fetchPlanById resposta raw:`, text.substring(0, 200));
+    debugLog('API', `fetchPlanById resposta raw:`, text.substring(0, 500));
     
     if (text.startsWith('<!') || text.startsWith('<html')) {
-      debugError('API', `fetchPlanById retornou HTML!`, { id });
-      return fallbackPricing.find(p => p.id === id) || null;
+      const error: ApiError = {
+        apiName: 'fetchPlanById',
+        url,
+        error: 'API retornou HTML ao invés de JSON',
+        details: `ID do plano: ${id}. Primeiros 200 chars: ${text.substring(0, 200)}`,
+        timestamp,
+        status: response.status,
+        rawResponse: text.substring(0, 1000)
+      };
+      addApiError(error);
+      return { success: false, error };
+    }
+    
+    if (!text || text.trim() === '') {
+      const error: ApiError = {
+        apiName: 'fetchPlanById',
+        url,
+        error: 'API retornou resposta vazia',
+        details: `ID do plano: ${id}`,
+        timestamp,
+        status: response.status
+      };
+      addApiError(error);
+      return { success: false, error };
     }
     
     const parsed = JSON.parse(text);
@@ -622,10 +766,18 @@ export async function fetchPlanById(id: string): Promise<PricingPlan | null> {
     };
     
     debugLog('API', `fetchPlanById normalizado:`, normalizedPlan);
-    return normalizedPlan;
+    return { success: true, data: normalizedPlan };
   } catch (error) {
-    debugError('API', `Erro em fetchPlanById:`, { id, error });
-    return fallbackPricing.find(p => p.id === id) || null;
+    const apiError: ApiError = {
+      apiName: 'fetchPlanById',
+      url: `${API_BASE_URL}/land_plano.asp?id=${id}`,
+      error: 'Erro ao buscar plano',
+      details: error instanceof Error ? error.message : String(error),
+      timestamp
+    };
+    debugError('API', `Erro em fetchPlanById:`, apiError);
+    addApiError(apiError);
+    return { success: false, error: apiError };
   }
 }
 
@@ -876,6 +1028,6 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
   return { success: false, message: 'Use createPayment instead' };
 }
 
-export async function fetchPortfolio(): Promise<PortfolioData> {
+export async function fetchPortfolio(): Promise<ApiResult<PortfolioData>> {
   return safeFetch(`${API_BASE_URL}/land_portfolio.asp`, fallbackPortfolio, 'fetchPortfolio');
 }

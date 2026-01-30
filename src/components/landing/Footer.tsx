@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Instagram, Facebook, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
-import { fetchSiteConfig, fetchPageTexts, SiteConfig, PageTexts } from '@/lib/api';
+import { fetchSiteConfig, fetchPageTexts, SiteConfig, PageTexts, ApiError, isApiFailure } from '@/lib/api';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 const socialIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   instagram: Instagram,
@@ -13,10 +14,37 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
   const [siteConfig, setSiteConfig] = useState<SiteConfig>({ name: 'Datebook' });
   const [texts, setTexts] = useState<PageTexts['footer'] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const [configResult, textsResult] = await Promise.all([
+      fetchSiteConfig(),
+      fetchPageTexts()
+    ]);
+    
+    if (isApiFailure(configResult)) {
+      setError(configResult.error);
+      setLoading(false);
+      return;
+    }
+    setSiteConfig(configResult.data);
+    
+    if (isApiFailure(textsResult)) {
+      setError(textsResult.error);
+      setLoading(false);
+      return;
+    }
+    setTexts(textsResult.data.footer);
+    
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchSiteConfig().then(setSiteConfig);
-    fetchPageTexts().then(data => setTexts(data.footer));
+    loadData();
   }, []);
 
   const scrollToSection = (id: string) => {
@@ -25,6 +53,26 @@ export function Footer() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (loading) {
+    return (
+      <footer className="bg-foreground text-primary-foreground py-16">
+        <div className="container mx-auto px-4 text-center">
+          <div className="animate-pulse">Carregando...</div>
+        </div>
+      </footer>
+    );
+  }
+
+  if (error) {
+    return (
+      <footer className="bg-foreground text-primary-foreground py-16">
+        <div className="container mx-auto px-4">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar Footer" />
+        </div>
+      </footer>
+    );
+  }
 
   if (!texts) return null;
 

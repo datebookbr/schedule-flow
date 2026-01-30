@@ -2,16 +2,44 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, FileText, Shield, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { fetchSiteConfig, fetchLegalContent, SiteConfig, LegalContent } from '@/lib/api';
+import { fetchSiteConfig, fetchLegalContent, SiteConfig, LegalContent, ApiError, isApiFailure } from '@/lib/api';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 export default function Termos() {
   const [siteConfig, setSiteConfig] = useState<SiteConfig>({ name: 'Datebook' });
   const [legalContent, setLegalContent] = useState<LegalContent | null>(null);
   const [activeSection, setActiveSection] = useState<string>('termos');
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const [configResult, legalResult] = await Promise.all([
+      fetchSiteConfig(),
+      fetchLegalContent()
+    ]);
+    
+    if (isApiFailure(configResult)) {
+      setError(configResult.error);
+      setLoading(false);
+      return;
+    }
+    setSiteConfig(configResult.data);
+    
+    if (isApiFailure(legalResult)) {
+      setError(legalResult.error);
+      setLoading(false);
+      return;
+    }
+    setLegalContent(legalResult.data);
+    
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchSiteConfig().then(setSiteConfig);
-    fetchLegalContent().then(setLegalContent);
+    loadData();
   }, []);
 
   const sections = [
@@ -36,6 +64,29 @@ export default function Termos() {
 
   const content = getCurrentContent();
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="bg-gradient-hero text-primary-foreground py-12">
+          <div className="container mx-auto px-4">
+            <Link to="/">
+              <Button variant="ghost" className="mb-6 text-primary-foreground/80 hover:text-primary-foreground hover:bg-white/10">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Voltar ao início
+              </Button>
+            </Link>
+            <h2 className="text-3xl md:text-4xl font-bold mb-2">
+              Documentos Legais
+            </h2>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-12">
+          <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar conteúdo legal" />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -59,7 +110,7 @@ export default function Termos() {
             Documentos Legais
           </h2>
           <p className="text-primary-foreground/80">
-            Última atualização: {legalContent?.lastUpdate || 'Carregando...'}
+            Última atualização: {legalContent?.lastUpdate || (loading ? 'Carregando...' : 'Não disponível')}
           </p>
         </div>
       </header>
@@ -89,7 +140,16 @@ export default function Termos() {
       {/* Content */}
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
-          {content ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-pulse">
+                <div className="h-8 bg-muted rounded w-1/3 mx-auto mb-4" />
+                <div className="h-4 bg-muted rounded w-full mb-2" />
+                <div className="h-4 bg-muted rounded w-5/6 mb-2" />
+                <div className="h-4 bg-muted rounded w-4/6" />
+              </div>
+            </div>
+          ) : content ? (
             <article className="prose prose-lg max-w-none">
               <h1 className="text-3xl font-bold text-foreground mb-8">
                 {content.title}
@@ -107,13 +167,8 @@ export default function Termos() {
               ))}
             </article>
           ) : (
-            <div className="text-center py-12">
-              <div className="animate-pulse">
-                <div className="h-8 bg-muted rounded w-1/3 mx-auto mb-4" />
-                <div className="h-4 bg-muted rounded w-full mb-2" />
-                <div className="h-4 bg-muted rounded w-5/6 mb-2" />
-                <div className="h-4 bg-muted rounded w-4/6" />
-              </div>
+            <div className="text-center py-12 text-muted-foreground">
+              Conteúdo não disponível
             </div>
           )}
         </div>
