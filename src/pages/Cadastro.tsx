@@ -64,20 +64,46 @@ export default function Cadastro() {
   const slugCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSuggestedSlugRef = useRef<string>('');
 
+  const [configError, setConfigError] = useState<string | null>(null);
+
   useEffect(() => {
     const loadConfig = async () => {
       setLoadingConfig(true);
+      setConfigError(null);
       console.log('[CADASTRO] Carregando config com slug:', slug, 'plano:', plano);
-      const config = await fetchSlugConfig(slug, plano);
-      setSlugConfig(config);
-      setLoadingConfig(false);
       
-      if (!config.success) {
+      try {
+        const config = await fetchSlugConfig(slug, plano);
+        console.log('[CADASTRO] Config recebida:', JSON.stringify(config, null, 2));
+        setSlugConfig(config);
+        
+        if (!config.success) {
+          const errorMsg = `Configuração não encontrada para slug="${slug}", plano="${plano}"`;
+          console.error('[CADASTRO] API Error:', errorMsg, config);
+          setConfigError(errorMsg);
+          toast({
+            title: 'Configuração não encontrada',
+            description: 'Verifique o link de acesso.',
+            variant: 'destructive'
+          });
+        }
+      } catch (error) {
+        const errorDetails = {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          slug,
+          plano,
+          timestamp: new Date().toISOString()
+        };
+        console.error('[CADASTRO] ERRO CRÍTICO ao carregar config:', errorDetails);
+        setConfigError(`Erro ao carregar configuração: ${errorDetails.message}`);
         toast({
-          title: 'Configuração não encontrada',
-          description: 'Verifique o link de acesso.',
+          title: 'Erro ao carregar configuração',
+          description: `Detalhes: ${errorDetails.message}`,
           variant: 'destructive'
         });
+      } finally {
+        setLoadingConfig(false);
       }
     };
     
@@ -132,8 +158,28 @@ export default function Cadastro() {
     setSlugStatus('checking');
     
     try {
-      const response = await fetch(`/api/check_slug.asp?slug=${encodeURIComponent(slugValue)}`);
-      const data = await response.json();
+      const url = `/api/check_slug.asp?slug=${encodeURIComponent(slugValue)}`;
+      console.log('[SLUG] Verificando disponibilidade:', url);
+      
+      const response = await fetch(url);
+      console.log('[SLUG] Response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const text = await response.text();
+      console.log('[SLUG] Response raw:', text);
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error('[SLUG] Erro ao parsear JSON:', { text, parseError });
+        throw new Error(`JSON inválido: ${text.substring(0, 100)}`);
+      }
+      
+      console.log('[SLUG] Response parsed:', data);
       
       if (data.disponivel) {
         setSlugStatus('available');
@@ -143,9 +189,15 @@ export default function Cadastro() {
         setSlugError('Este endereço já está em uso');
       }
     } catch (error) {
-      console.error('[SLUG] Erro ao verificar disponibilidade:', error);
+      const errorDetails = {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        slugValue,
+        timestamp: new Date().toISOString()
+      };
+      console.error('[SLUG] ERRO ao verificar disponibilidade:', errorDetails);
       setSlugStatus('idle');
-      setSlugError('Erro ao verificar disponibilidade');
+      setSlugError(`Erro: ${errorDetails.message}`);
     }
   }, []);
 
@@ -322,10 +374,17 @@ export default function Cadastro() {
         });
       }
     } catch (error) {
-      console.error('[CADASTRO] Erro:', error);
+      const errorDetails = {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        formData: { ...formData, cpfCnpj: '***MASKED***' },
+        slug,
+        timestamp: new Date().toISOString()
+      };
+      console.error('[CADASTRO] ERRO CRÍTICO no submit:', errorDetails);
       toast({
-        title: 'Erro',
-        description: 'Ocorreu um erro ao processar seu cadastro. Tente novamente.',
+        title: 'Erro no cadastro',
+        description: `Detalhes: ${errorDetails.message}`,
         variant: 'destructive'
       });
     } finally {
@@ -337,6 +396,26 @@ export default function Cadastro() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Show error screen instead of white screen
+  if (configError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-8 max-w-lg text-center">
+          <h1 className="text-2xl font-bold text-destructive mb-4">Erro ao carregar página</h1>
+          <p className="text-muted-foreground mb-4">{configError}</p>
+          <div className="bg-card p-4 rounded-lg text-left text-sm font-mono text-muted-foreground mb-4 overflow-auto max-h-40">
+            <p>Slug: {slug}</p>
+            <p>Plano: {plano || '(vazio)'}</p>
+            <p>URL: {window.location.href}</p>
+          </div>
+          <Button onClick={() => window.location.reload()}>
+            Tentar novamente
+          </Button>
+        </div>
       </div>
     );
   }
@@ -637,7 +716,10 @@ export default function Cadastro() {
                   <div className="flex justify-between items-baseline">
                     <span className="text-muted-foreground">Valor</span>
                     <span className="text-2xl font-bold text-foreground">
-                      R$ {(slugConfig?.valor ?? 0).toFixed(2).replace('.', ',')}
+                      {slugConfig?.valor !== undefined 
+                        ? `R$ ${slugConfig.valor.toFixed(2).replace('.', ',')}`
+                        : <span className="text-destructive text-base">Valor não informado</span>
+                      }
                     </span>
                   </div>
                 </div>
