@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import Cadastro from "./pages/Cadastro";
 import Pagamento from "./pages/Pagamento";
 import Termos from "./pages/Termos";
+import Blog from "./pages/Blog";
+import BlogArticle from "./pages/BlogArticle";
 import NotFound from "./pages/NotFound";
 import CookieConsent from "./components/CookieConsent";
 
@@ -23,6 +25,8 @@ const App = () => (
           <Route path="/cadastro" element={<Cadastro />} />
           <Route path="/pagamento" element={<Pagamento />} />
           <Route path="/termos" element={<Termos />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogArticle />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
