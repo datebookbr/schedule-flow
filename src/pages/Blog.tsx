@@ -1,9 +1,78 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, ArrowRight, Search } from 'lucide-react';
-import { blogArticles } from '@/data/blog-articles';
 import { Button } from '@/components/ui/button';
+import { fetchBlogArticles, ApiBlogArticle, ApiError, isApiFailure } from '@/lib/api';
+import { blogArticles as localArticles } from '@/data/blog-articles';
+import { ApiErrorDisplay } from '@/components/ApiErrorDisplay';
 
 export default function Blog() {
+  const [articles, setArticles] = useState<ApiBlogArticle[]>([]);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    const result = await fetchBlogArticles();
+    if (isApiFailure(result)) {
+      // Fallback to local articles if API fails
+      console.warn('[Blog] API falhou, usando artigos locais como fallback:', result.error);
+      const mapped: ApiBlogArticle[] = localArticles.map(a => ({
+        slug: a.slug,
+        title: a.title,
+        metaTitle: a.metaTitle,
+        metaDescription: a.metaDescription,
+        excerpt: a.excerpt,
+        keyword: a.keyword,
+        category: a.category,
+        readTime: a.readTime,
+        publishedAt: a.publishedAt,
+        updatedAt: a.updatedAt,
+        author: a.author,
+        image: a.image,
+        content: '', // Not needed for listing
+      }));
+      setArticles(mapped);
+      setLoading(false);
+      return;
+    }
+    // If API returns empty array, fall back to local
+    if (result.data.length === 0) {
+      const mapped: ApiBlogArticle[] = localArticles.map(a => ({
+        slug: a.slug,
+        title: a.title,
+        metaTitle: a.metaTitle,
+        metaDescription: a.metaDescription,
+        excerpt: a.excerpt,
+        keyword: a.keyword,
+        category: a.category,
+        readTime: a.readTime,
+        publishedAt: a.publishedAt,
+        updatedAt: a.updatedAt,
+        author: a.author,
+        image: a.image,
+        content: '',
+      }));
+      setArticles(mapped);
+    } else {
+      setArticles(result.data);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    document.title = 'Blog | Datebook - Dicas para Salões de Beleza e Barbearias';
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', 'Conteúdo prático sobre gestão, agendamento e crescimento para profissionais da beleza. Dicas e estratégias para salões de beleza e barbearias.');
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* SEO: only one H1 */}
@@ -29,51 +98,70 @@ export default function Blog() {
       </header>
 
       <main className="container mx-auto px-4 py-12 md:py-20">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {blogArticles.map((article) => (
-            <Link
-              key={article.slug}
-              to={`/blog/${article.slug}`}
-              className="group bg-card rounded-2xl overflow-hidden border border-border/50 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="aspect-[16/9] overflow-hidden">
-                <img
-                  src={article.image}
-                  alt={article.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  loading="lazy"
-                />
-              </div>
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
-                    {article.category}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    {article.readTime} min de leitura
-                  </span>
-                </div>
-                <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors leading-tight">
-                  {article.title}
-                </h2>
-                <p className="text-muted-foreground text-sm leading-relaxed mb-4 line-clamp-3">
-                  {article.excerpt}
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Calendar className="w-3 h-3" />
-                    {new Date(article.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </span>
-                  <span className="text-sm font-semibold text-primary group-hover:underline flex items-center gap-1">
-                    Ler artigo
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="animate-pulse bg-card rounded-2xl overflow-hidden border border-border/50">
+                <div className="aspect-[16/9] bg-muted" />
+                <div className="p-6 space-y-3">
+                  <div className="h-4 bg-muted rounded w-1/3" />
+                  <div className="h-6 bg-muted rounded w-full" />
+                  <div className="h-4 bg-muted rounded w-5/6" />
                 </div>
               </div>
-            </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="max-w-3xl mx-auto">
+            <ApiErrorDisplay error={error} onRetry={loadData} title="Erro ao carregar artigos" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {articles.map((article) => (
+              <Link
+                key={article.slug}
+                to={`/blog/${article.slug}`}
+                className="group bg-card rounded-2xl overflow-hidden border border-border/50 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              >
+                <div className="aspect-[16/9] overflow-hidden">
+                  <img
+                    src={article.image}
+                    alt={article.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                      {article.category}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      {article.readTime} min de leitura
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors leading-tight">
+                    {article.title}
+                  </h2>
+                  <p className="text-muted-foreground text-sm leading-relaxed mb-4 line-clamp-3">
+                    {article.excerpt}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(article.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                    <span className="text-sm font-semibold text-primary group-hover:underline flex items-center gap-1">
+                      Ler artigo
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </main>
 
       {/* Blog CTA */}
@@ -92,9 +180,9 @@ export default function Blog() {
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
-            <Link to="/">
+            <Link to="/faq">
               <Button variant="outline" size="lg">
-                Conhecer o Datebook
+                Perguntas frequentes
               </Button>
             </Link>
           </div>
@@ -108,6 +196,7 @@ export default function Blog() {
           <div className="flex items-center justify-center gap-4 mt-3">
             <Link to="/" className="hover:text-primary transition-colors">Início</Link>
             <Link to="/blog" className="hover:text-primary transition-colors font-medium text-foreground">Blog</Link>
+            <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
             <Link to="/termos" className="hover:text-primary transition-colors">Termos</Link>
           </div>
         </div>
