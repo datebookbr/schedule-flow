@@ -9,6 +9,7 @@ import Pagamento from "./pages/Pagamento";
 import Termos from "./pages/Termos";
 import Blog from "./pages/Blog";
 import BlogArticle from "./pages/BlogArticle";
+import Faq from "./pages/Faq";
 import NotFound from "./pages/NotFound";
 import CookieConsent from "./components/CookieConsent";
 
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/termos" element={<Termos />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogArticle />} />
+          <Route path="/faq" element={<Faq />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

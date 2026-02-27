@@ -1031,3 +1031,60 @@ export async function processPayment(data: PaymentData): Promise<PaymentResponse
 export async function fetchPortfolio(): Promise<ApiResult<PortfolioData>> {
   return safeFetch(`${API_BASE_URL}/land_portfolio.asp`, fallbackPortfolio, 'fetchPortfolio');
 }
+
+// ============= FAQ INTERFACES =============
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
+const fallbackFaq: FaqItem[] = [
+  { question: "O que é o Datebook?", answer: "O Datebook é um sistema de agendamento online para salões de beleza e barbearias, com integração nativa ao WhatsApp." },
+  { question: "O Datebook funciona para barbearias?", answer: "Sim. O Datebook foi desenvolvido para atender barbearias de todos os tamanhos, desde autônomos até redes com múltiplas unidades." },
+  { question: "Preciso instalar algum aplicativo?", answer: "Não. O Datebook funciona 100% pelo navegador, tanto para você quanto para seus clientes. Não é necessário instalar nada." },
+  { question: "O Datebook envia lembretes pelo WhatsApp?", answer: "Sim. Lembretes automáticos são enviados diretamente pelo WhatsApp para reduzir faltas e melhorar a confirmação de agendamentos." },
+  { question: "Posso gerenciar múltiplos profissionais?", answer: "Sim. Cada profissional tem sua própria agenda independente, com horários e serviços configuráveis individualmente." },
+  { question: "Quanto custa o Datebook?", answer: "Os planos começam a partir de R$ 49,90/mês, com todas as funcionalidades incluídas. Consulte nossa página de preços para mais detalhes." },
+  { question: "Existe período de teste gratuito?", answer: "Sim. Você pode testar o Datebook gratuitamente antes de decidir qual plano é ideal para o seu negócio." },
+  { question: "O sistema funciona no celular?", answer: "Sim. O Datebook é totalmente responsivo e funciona perfeitamente em smartphones, tablets e computadores." },
+  { question: "Como meus clientes agendam?", answer: "Seus clientes acessam a página exclusiva do seu estabelecimento, escolhem o profissional, serviço e horário, e confirmam o agendamento em poucos cliques." },
+  { question: "O Datebook oferece suporte técnico?", answer: "Sim. Oferecemos suporte técnico dedicado para ajudar você em todas as etapas, desde a configuração até o uso diário do sistema." }
+];
+
+export async function fetchFaq(): Promise<ApiResult<FaqItem[]>> {
+  return safeFetch(`${API_BASE_URL}/land_faq.asp`, fallbackFaq, 'fetchFaq');
+}
+
+// ============= BLOG API INTERFACES =============
+
+export interface ApiBlogArticle {
+  slug: string;
+  title: string;
+  metaTitle: string;
+  metaDescription: string;
+  excerpt: string;
+  keyword?: string;
+  category: string;
+  readTime: number;
+  publishedAt: string;
+  updatedAt?: string;
+  author: string;
+  image: string;
+  content: string; // HTML content
+  faqs?: FaqItem[];
+}
+
+const fallbackBlogList: ApiBlogArticle[] = [];
+
+export async function fetchBlogArticles(): Promise<ApiResult<ApiBlogArticle[]>> {
+  return safeFetch(`${API_BASE_URL}/land_blog.asp`, fallbackBlogList, 'fetchBlogArticles');
+}
+
+export async function fetchBlogArticle(slug: string): Promise<ApiResult<ApiBlogArticle>> {
+  const fallbackArticle: ApiBlogArticle = {
+    slug, title: '', metaTitle: '', metaDescription: '', excerpt: '',
+    category: '', readTime: 0, publishedAt: '', author: '', image: '', content: ''
+  };
+  return safeFetch(`${API_BASE_URL}/land_blog.asp?slug=${encodeURIComponent(slug)}`, fallbackArticle, 'fetchBlogArticle');
+}
